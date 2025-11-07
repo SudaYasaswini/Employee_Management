@@ -11,6 +11,20 @@ export const useAuth = () => {
   return context;
 };
 
+// Minimal helper to look up employee email in backend (dev-only)
+async function findEmployeeByEmail(email) {
+  try {
+    const res = await fetch(`/api/employees?page=0&size=500`);
+    if (!res.ok) return null;
+    const data = await res.json();
+    const list = data?.content || [];
+    const emp = list.find((e) => String(e.email).toLowerCase() === String(email).toLowerCase());
+    return emp || null;
+  } catch {
+    return null;
+  }
+}
+
 export const AuthProvider = ({ children }) => {
   const [user, setUser] = useState(null);
   const [loading, setLoading] = useState(true);
@@ -24,17 +38,35 @@ export const AuthProvider = ({ children }) => {
     setLoading(false);
   }, []);
 
-  const login = (email, password) => {
-    const foundUser = mockUsers.find(
-      (u) => u.email === email && u.password === password
-    );
+  const login = async (email, password) => {
+    // 1) Existing mock/demos path (unchanged)
+    if (password) {
+      const foundUser = mockUsers.find(
+        (u) => u.email === email && u.password === password
+      );
+      if (foundUser) {
+        const userWithoutPassword = { ...foundUser };
+        delete userWithoutPassword.password;
+        setUser(userWithoutPassword);
+        localStorage.setItem('user', JSON.stringify(userWithoutPassword));
+        return { success: true, user: userWithoutPassword };
+      }
+      // If password supplied but not found in mock, continue to email-only fallback as a convenience
+    }
 
-    if (foundUser) {
-      const userWithoutPassword = { ...foundUser };
-      delete userWithoutPassword.password;
-      setUser(userWithoutPassword);
-      localStorage.setItem('user', JSON.stringify(userWithoutPassword));
-      return { success: true, user: userWithoutPassword };
+    // 2) Email-only employee login (dev-only, no backend auth)
+    const emp = await findEmployeeByEmail(email);
+    if (emp) {
+      const employeeUser = {
+        id: emp.id,
+        empId: emp.empId,
+        email: emp.email,
+        name: [emp.firstName, emp.lastName].filter(Boolean).join(' ') || emp.empId,
+        role: 'Employee', // minimal role tagging to keep hasRole working
+      };
+      setUser(employeeUser);
+      localStorage.setItem('user', JSON.stringify(employeeUser));
+      return { success: true, user: employeeUser };
     }
 
     return { success: false, error: 'Invalid email or password' };

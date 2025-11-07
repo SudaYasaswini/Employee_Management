@@ -19,9 +19,13 @@ import { toast } from '../../hooks/use-toast';
 import { Toaster } from '../../components/ui/toaster';
 import axios from 'axios';
 
+// =====================
+// Module-scope helpers
+// =====================
+
 // Axios instance and API helpers
 const api = axios.create({
-  baseURL: '/', // same origin; change if API host differs
+  baseURL: '/', // use Vite proxy or set to http://localhost:8083
   headers: { 'Content-Type': 'application/json' },
 });
 
@@ -34,9 +38,38 @@ const EmployeeApi = {
   delete: (id) => api.delete(`/api/employees/${id}`).then((r) => r.data),
 };
 
-// Helpers to normalize types for backend min/max/regex constraints
+
+const StatsApi = {
+  onboarded: (fromISO, toISO) =>
+    api.get(`/api/employees/stats/onboarded?from=${encodeURIComponent(fromISO)}&to=${encodeURIComponent(toISO)}`)
+       .then(r => r.data),
+};
+
+
+// Type normalizers
 const parseNum = (v) => (v === '' || v === null || v === undefined ? undefined : Number(v));
 const optionalEmpty = (v) => (v === '' ? undefined : v);
+
+// UI helpers
+const getStatusColor = (status) => {
+  const colors = {
+    Pending: 'bg-yellow-100 text-yellow-800 border-yellow-200',
+    'In Progress': 'bg-blue-100 text-blue-800 border-blue-200',
+    Completed: 'bg-green-100 text-green-800 border-green-200',
+  };
+  return colors[status] || 'bg-gray-100 text-gray-800 border-gray-200';
+};
+
+// EmpId helpers (client-side best-effort)
+const parseEmpNum = (empId) => {
+  const m = String(empId || '').match(/^EMP-(\d{1,})$/);
+  return m ? Number(m[1]) : null;
+};
+const nextEmpIdFrom = (last) => {
+  const n = (parseEmpNum(last) || 0) + 1;
+  return `EMP-${String(n).padStart(4, '0')}`; // EMP-0001 style
+};
+const randomEmpId = () => `EMP-${Math.random().toString(36).slice(2, 8).toUpperCase()}`;
 
 // Create dialog form model mapped to EmployeeCreateRequest
 const emptyCreate = {
@@ -53,7 +86,7 @@ const emptyCreate = {
   emergencyContact: { name: '', contactNumber: '', relation: '' },
 };
 
-const OnboardingPage = () => {
+export default function OnboardingPage() {
   // List state
   const [listLoading, setListLoading] = useState(false);
   const [employees, setEmployees] = useState([]);
@@ -75,18 +108,32 @@ const OnboardingPage = () => {
   // Quick search by EmpID
   const [empIdQuery, setEmpIdQuery] = useState('');
 
-  // Offboarding placeholders (UI demo only)
+  const [onboardedThisMonth, setOnboardedThisMonth] = useState(0);
+
+const monthRange = () => {
+  const now = new Date();
+  const from = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), 1, 0, 0, 0, 0));
+  const to = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth() + 1, 1, 0, 0, 0, 0));
+  return { from: from.toISOString(), to: to.toISOString() };
+};
+
+const loadOnboardedThisMonth = async () => {
+  try {
+    const { from, to } = monthRange();
+    const res = await StatsApi.onboarded(from, to);
+    setOnboardedThisMonth(Number(res?.count || 0));
+  } catch {
+    setOnboardedThisMonth(0);
+  }
+};
+
+useEffect(() => {
+  loadOnboardedThisMonth();
+}, []);
+
+
+  // Offboarding placeholders removed
   const offboardingList = [];
-
-
-  const getStatusColor = (status) => {
-    const colors = {
-      Pending: 'bg-yellow-100 text-yellow-800 border-yellow-200',
-      'In Progress': 'bg-blue-100 text-blue-800 border-blue-200',
-      Completed: 'bg-green-100 text-green-800 border-green-200',
-    };
-    return colors[status] || 'bg-gray-100 text-gray-800 border-gray-200';
-  };
 
   // Load paginated list from backend
   const loadList = async (p = page) => {
@@ -107,20 +154,31 @@ const OnboardingPage = () => {
     loadList(0);
   }, []);
 
+  // When opening the create dialog, auto-generate empId
+  const openCreate = async () => {
+    setCreateOpen(true);
+    try {
+      const data = await EmployeeApi.list(0, 1); // best-effort peek
+      const last = data?.content?.[0]?.empId;
+      const auto = nextEmpIdFrom(last) || randomEmpId();
+      setCreateForm((f) => ({ ...f, empId: auto }));
+    } catch {
+      setCreateForm((f) => ({ ...f, empId: randomEmpId() }));
+    }
+  };
+
   // Create employee submit (EmployeeCreateRequest)
   const submitCreate = async (e) => {
     e.preventDefault();
     setCreateSubmitting(true);
     try {
-      // Client-side minimal validation aligned to DTO
-      // empId pattern EMP-[A-Z0-9]{4,20}
+      // Validate patterns
       const empIdOk = /^EMP-[A-Z0-9]{4,20}$/.test(createForm.empId || '');
       if (!empIdOk) {
         toast({ title: 'Invalid Employee ID', description: 'Use pattern EMP-XXXX (uppercase letters/digits).' });
         setCreateSubmitting(false);
         return;
       }
-      // IFSC pattern ^[A-Z]{4}[A-Z0-9]{7}$
       const ifscOk = /^[A-Z]{4}[A-Z0-9]{7}$/.test(createForm.bankDetails.ifscCode || '');
       if (!ifscOk) {
         toast({ title: 'Invalid IFSC', description: 'Use 4 letters followed by 7 alphanumeric characters.' });
@@ -156,14 +214,22 @@ const OnboardingPage = () => {
           relation: createForm.emergencyContact.relation,
         },
       };
+
       const created = await EmployeeApi.create(payload);
       toast({ title: 'Employee created', description: `${created.empId} added successfully.` });
       setCreateForm(emptyCreate);
       setCreateOpen(false);
       await loadList(0);
     } catch (e) {
+      // If empId collision due to client-gen, regenerate to help user
       const msg = e?.response?.data?.message || e?.response?.data?.error || 'Could not create employee.';
-      toast({ title: 'Error', description: msg });
+      if (/empId/i.test(String(msg))) {
+        const regen = randomEmpId();
+        setCreateForm(f => ({ ...f, empId: regen }));
+        toast({ title: 'Emp ID regenerated', description: 'Previous ID was in use. Please submit again.' });
+      } else {
+        toast({ title: 'Error', description: msg });
+      }
     } finally {
       setCreateSubmitting(false);
     }
@@ -212,14 +278,11 @@ const OnboardingPage = () => {
       const raw = { ...editForm };
       if (raw.salary !== undefined && raw.salary !== '') raw.salary = Number(raw.salary);
       if (raw.phoneNumber !== undefined && raw.phoneNumber !== '') raw.phoneNumber = Number(raw.phoneNumber);
-      if (raw.address?.pincode !== undefined && raw.address.pincode !== '')
-        raw.address.pincode = Number(raw.address.pincode);
-      if (raw.bankDetails?.bankAccount !== undefined && raw.bankDetails.bankAccount !== '')
-        raw.bankDetails.bankAccount = Number(raw.bankDetails.bankAccount);
+      if (raw.address?.pincode !== undefined && raw.address.pincode !== '') raw.address.pincode = Number(raw.address.pincode);
+      if (raw.bankDetails?.bankAccount !== undefined && raw.bankDetails.bankAccount !== '') raw.bankDetails.bankAccount = Number(raw.bankDetails.bankAccount);
       if (raw.bankDetails?.ifscCode) raw.bankDetails.ifscCode = String(raw.bankDetails.ifscCode).toUpperCase();
       if (raw.bloodGroup) raw.bloodGroup = String(raw.bloodGroup).toUpperCase();
-      if (raw.emergencyContact?.contactNumber !== undefined && raw.emergencyContact.contactNumber !== '')
-        raw.emergencyContact.contactNumber = Number(raw.emergencyContact.contactNumber);
+      if (raw.emergencyContact?.contactNumber !== undefined && raw.emergencyContact.contactNumber !== '') raw.emergencyContact.contactNumber = Number(raw.emergencyContact.contactNumber);
 
       const payload = stripEmpty(raw);
       const updated = await EmployeeApi.update(editTarget.id, payload);
@@ -234,7 +297,7 @@ const OnboardingPage = () => {
     }
   };
 
-  // Delete employee
+  // Delete employee (shared by list and offboarding)
   const deleteEmployee = async (emp) => {
     if (!window.confirm(`Delete ${emp.empId}?`)) return;
     try {
@@ -274,6 +337,49 @@ const OnboardingPage = () => {
     };
   }, [employees, offboardingList.length]);
 
+  // Inline Offboarding tab state and handlers live here
+  const [offbFilter, setOffbFilter] = useState('');
+  const [offbConfirmOpen, setOffbConfirmOpen] = useState(false);
+  const [offbTarget, setOffbTarget] = useState(null);
+  const [offbInfo, setOffbInfo] = useState({ lastDay: '', reason: '' });
+  const [offbSubmitting, setOffbSubmitting] = useState(false);
+
+  const offbFiltered = useMemo(() => {
+    const q = offbFilter.trim().toLowerCase();
+    if (!q) return employees;
+    return employees.filter(e =>
+      ([e.firstName, e.lastName].filter(Boolean).join(' ').toLowerCase().includes(q)) ||
+      String(e.empId || '').toLowerCase().includes(q) ||
+      String(e.email || '').toLowerCase().includes(q)
+    );
+  }, [employees, offbFilter]);
+
+  const openOffbConfirm = (emp) => {
+    setOffbTarget(emp);
+    setOffbInfo({ lastDay: '', reason: '' });
+    setOffbConfirmOpen(true);
+  };
+
+  const submitOffboard = async () => {
+    if (!offbTarget) return;
+    if (!offbInfo.lastDay) {
+      toast({ title: 'Last day required', description: 'Please choose a last working day.' });
+      return;
+    }
+    setOffbSubmitting(true);
+    try {
+      await EmployeeApi.delete(offbTarget.id); // hard delete; swap to PATCH for soft offboarding later
+      toast({ title: 'Employee offboarded', description: `${offbTarget.empId} removed.` });
+      setOffbConfirmOpen(false);
+      await loadList(page);
+    } catch (e) {
+      const msg = e?.response?.data?.message || e?.response?.data?.error || 'Could not offboard employee.';
+      toast({ title: 'Error', description: msg });
+    } finally {
+      setOffbSubmitting(false);
+    }
+  };
+
   return (
     <div className="p-6 space-y-6">
       <div className="flex items-center justify-between">
@@ -285,7 +391,7 @@ const OnboardingPage = () => {
         {/* Create Employee Dialog */}
         <Dialog open={createOpen} onOpenChange={setCreateOpen}>
           <DialogTrigger asChild>
-            <Button onClick={() => setCreateOpen(true)} className="flex items-center text-white">
+            <Button onClick={openCreate} className="flex items-center text-white">
               <UserPlus className="w-4 h-4 mr-2" />
               Add New Employee
             </Button>
@@ -541,7 +647,7 @@ const OnboardingPage = () => {
           <CardContent className="p-4">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-sm text-gray-600">Active Onboarding</p>
+                <p className="text-sm text-gray-600">Active Employees</p>
                 <p className="text-2xl font-bold text-blue-600">{stats.activeOnboarding}</p>
               </div>
               <div className="w-12 h-12 bg-blue-100 rounded-lg flex items-center justify-center">
@@ -550,7 +656,7 @@ const OnboardingPage = () => {
             </div>
           </CardContent>
         </Card>
-        <Card>
+        {/* <Card>
           <CardContent className="p-4">
             <div className="flex items-center justify-between">
               <div>
@@ -562,13 +668,13 @@ const OnboardingPage = () => {
               </div>
             </div>
           </CardContent>
-        </Card>
+        </Card> */}
         <Card>
           <CardContent className="p-4">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-sm text-gray-600">Completed This Month</p>
-                <p className="text-2xl font-bold text-green-600">{stats.completedThisMonth}</p>
+                <p className="text-sm text-gray-600">Onboarded This Month</p>
+                <p className="text-2xl font-bold text-green-600">{onboardedThisMonth}</p>
               </div>
               <div className="w-12 h-12 bg-green-100 rounded-lg flex items-center justify-center">
                 <CheckCircle className="w-6 h-6 text-green-600" />
@@ -576,6 +682,7 @@ const OnboardingPage = () => {
             </div>
           </CardContent>
         </Card>
+
       </div>
 
       {/* Tabs */}
@@ -585,7 +692,7 @@ const OnboardingPage = () => {
           <TabsTrigger value="offboarding">Offboarding</TabsTrigger>
         </TabsList>
 
-        {/* Manager “IM list” simplified view (same table, shows only key fields) */}
+        {/* Onboarding list */}
         <TabsContent value="onboarding">
           <Card>
             <CardHeader className="flex flex-col md:flex-row md:items-end md:justify-between gap-4">
@@ -633,9 +740,6 @@ const OnboardingPage = () => {
                             <Button size="sm" variant="outline" onClick={() => openEdit(e)}>
                               <Pencil className="w-4 h-4 mr-1" /> Edit
                             </Button>
-                            <Button size="sm" variant="ghost" onClick={() => deleteEmployee(e)}>
-                              <Trash2 className="w-4 h-4 mr-1" /> Delete
-                            </Button>
                           </div>
                         </td>
                       </tr>
@@ -674,6 +778,7 @@ const OnboardingPage = () => {
           </Card>
         </TabsContent>
 
+        {/* Offboarding */}
         <TabsContent value="offboarding">
           <Card>
             <CardHeader>
@@ -682,27 +787,90 @@ const OnboardingPage = () => {
             </CardHeader>
             <CardContent>
               <div className="space-y-4">
-                {offboardingList.map((item) => (
-                  <div
-                    key={item.id}
-                    className="flex items-center justify-between p-4 border border-gray-200 rounded-lg hover:bg-gray-50 transition-colors"
-                  >
-                    <div className="flex-1">
-                      <h4 className="font-medium text-gray-900">{item.employee}</h4>
-                      <p className="text-sm text-gray-600 mt-1">{item.department}</p>
-                      <p className="text-xs text-gray-500 mt-1">Last Day: {new Date(item.lastDay).toLocaleDateString()}</p>
-                    </div>
-                    <div className="flex items-center space-x-3">
-                      <Badge variant="outline" className={getStatusColor(item.status)}>
-                        {item.status}
-                      </Badge>
-                      <Button variant="outline" size="sm">
-                        <FileText className="w-4 h-4 mr-2" />
-                        View
-                      </Button>
-                    </div>
-                  </div>
-                ))}
+                <div className="flex items-center gap-2">
+                  <Input
+                    placeholder="Search name, Emp ID, or email..."
+                    value={offbFilter}
+                    onChange={(e) => setOffbFilter(e.target.value)}
+                    className="max-w-sm"
+                  />
+                  <Button variant="outline" onClick={() => setOffbFilter('')}>Clear</Button>
+                </div>
+
+                <div className="overflow-x-auto">
+                  <table className="w-full text-sm">
+                    <thead>
+                      <tr className="text-left border-b">
+                        <th className="py-3 pr-3">Name</th>
+                        <th className="py-3 pr-3">Emp ID</th>
+                        <th className="py-3 pr-3">Email</th>
+                        <th className="py-3 pr-3">Role</th>
+                        <th className="py-3 pr-3">Actions</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {offbFiltered.map((e) => (
+                        <tr key={e.id} className="border-b last:border-0">
+                          <td className="py-3 pr-3">{[e.firstName, e.lastName].filter(Boolean).join(' ') || '—'}</td>
+                          <td className="py-3 pr-3"><Badge variant="outline">{e.empId}</Badge></td>
+                          <td className="py-3 pr-3">{e.email}</td>
+                          <td className="py-3 pr-3">{e.empRole}</td>
+                          <td className="py-3 pr-3">
+                            <Button size="sm" variant="destructive" onClick={() => openOffbConfirm(e)}>
+                              Offboard
+                            </Button>
+                          </td>
+                        </tr>
+                      ))}
+                      {offbFiltered.length === 0 && (
+                        <tr>
+                          <td colSpan={5} className="py-6 text-center text-gray-500">No matches</td>
+                        </tr>
+                      )}
+                    </tbody>
+                  </table>
+                </div>
+
+                {/* Offboard confirmation dialog */}
+                <Dialog open={offbConfirmOpen} onOpenChange={setOffbConfirmOpen}>
+                  <DialogContent className="max-w-md">
+                    <DialogHeader>
+                      <DialogTitle>Confirm Offboarding</DialogTitle>
+                      <DialogDescription>
+                        Provide the last working day and a brief reason to proceed.
+                      </DialogDescription>
+                    </DialogHeader>
+                    {offbTarget && (
+                      <div className="space-y-4">
+                        <div className="text-sm text-gray-700">
+                          {[offbTarget.firstName, offbTarget.lastName].filter(Boolean).join(' ')} — <span className="font-mono">{offbTarget.empId}</span>
+                        </div>
+                        <div className="space-y-2">
+                          <Label>Last Working Day</Label>
+                          <Input
+                            type="date"
+                            value={offbInfo.lastDay}
+                            onChange={(e) => setOffbInfo((s) => ({ ...s, lastDay: e.target.value }))}
+                          />
+                        </div>
+                        <div className="space-y-2">
+                          <Label>Reason</Label>
+                          <Input
+                            placeholder="Resignation, termination, contract end, etc."
+                            value={offbInfo.reason}
+                            onChange={(e) => setOffbInfo((s) => ({ ...s, reason: e.target.value }))}
+                          />
+                        </div>
+                        <div className="flex justify-end gap-2">
+                          <Button variant="ghost" onClick={() => setOffbConfirmOpen(false)}>Cancel</Button>
+                          <Button variant="destructive" onClick={submitOffboard} disabled={offbSubmitting}>
+                            {offbSubmitting ? 'Removing...' : 'Confirm Offboard'}
+                          </Button>
+                        </div>
+                      </div>
+                    )}
+                  </DialogContent>
+                </Dialog>
               </div>
             </CardContent>
           </Card>
@@ -928,6 +1096,4 @@ const OnboardingPage = () => {
       <Toaster />
     </div>
   );
-};
-
-export default OnboardingPage;
+}

@@ -1,0 +1,47 @@
+[
+  {
+    "id": "temp001",
+    "type": "Website Development",
+    "title": "Build Navigation Bar",
+    "description": "Implement responsive navigation with dropdown menus.",
+    "defaultRole": "Frontend Developer",
+    "defaultEstimateHours": 8,
+    "priority": "MEDIUM"
+  },
+  {
+    "id": "temp002",
+    "type": "Mobile App Development",
+    "title": "Setup Authentication Screens",
+    "description": "Login, signup, password reset screens.",
+    "defaultRole": "Mobile Developer",
+    "defaultEstimateHours": 10,
+    "priority": "HIGH"
+  },
+  {
+    "id": "temp003",
+    "type": "E-commerce Development",
+    "title": "Setup Product Catalog",
+    "description": "Create product listing and detail pages.",
+    "defaultRole": "Backend Developer",
+    "defaultEstimateHours": 14,
+    "priority": "HIGH"
+  },
+  {
+    "id": "temp004",
+    "type": "SEO Services",
+    "title": "Perform Keyword Research",
+    "description": "Find and analyze top-performing keywords.",
+    "defaultRole": "SEO Specialist",
+    "defaultEstimateHours": 5,
+    "priority": "MEDIUM"
+  },
+  {
+    "id": "temp005",
+    "type": "Digital Marketing",
+    "title": "Setup Google Ads Campaign",
+    "description": "Create ad groups, keywords, and configure conversions.",
+    "defaultRole": "Marketing Manager",
+    "defaultEstimateHours": 7,
+    "priority": "HIGH"
+  }
+]

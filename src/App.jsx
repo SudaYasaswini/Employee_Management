@@ -5,6 +5,7 @@ import { AuthProvider } from "./contexts/AuthContext";
 import AppShell from "./components/Layout/AppShell";
 import ProtectedRoute from "./components/ProtectedRoute";
 import OnboardingPage from "./pages/HR/OnboardingPage";
+
 // Auth Pages
 import Login from "./pages/Login";
 import Unauthorized from "./pages/Unauthorized";
@@ -12,12 +13,16 @@ import RoleRedirect from "./pages/RoleRedirect";
 
 // Manager Pages
 import ClientIntakePage from "./pages/Manager/ClientRequirement";
+import ProjectsPage from "./pages/Manager/Projectspage";
 import EmployeesPage from "./pages/Manager/EmployeesPage";
 import AssignTaskPage from "./pages/Manager/AssignTaskPage";
 import AttendanceSalaryPage from "./pages/Manager/AttendanceSalaryPage";
 import AllTasksPage from "./pages/Manager/AllTasksPage";
 import TaskHistoryPage from "./pages/Manager/TaskHistoryPage";
 import ManagerBoard from "./pages/Manager/ManagerBoard";
+import ProjectFieldsPage from "./pages/Manager/ProjectFieldsPage";
+import ProjectSpacesPage from "./pages/Spaces/ProjectSpacesPage";
+import SpacesPage from "./pages/SpacesPage";
 
 // Employee Pages
 import MyTasksPage from "./pages/Employee/MyTasksPage";
@@ -30,7 +35,7 @@ import EmployeeDirectoryPage from "./pages/HR/EmployeeDirectoryPage";
 import AttendanceManagementPage from "./pages/HR/AttendanceManagementPage";
 import OnboardingHRPage from "./pages/HR/OnboardingPage";
 
-// Placeholder for other pages
+// CEO Pages (Placeholder)
 const PlaceholderPage = ({ title }) => (
   <div className="p-6">
     <div className="max-w-4xl mx-auto text-center py-20">
@@ -43,17 +48,19 @@ const PlaceholderPage = ({ title }) => (
   </div>
 );
 
+
+
 function App() {
   return (
     <div className="App">
       <AuthProvider>
         <BrowserRouter>
           <Routes>
-            {/* Public Routes */}
+            {/* ---------- Public Routes ---------- */}
             <Route path="/login" element={<Login />} />
-            <Route path="/unauthorized" element={<Unauthorized />} />
+            <Route path="/unauthorized" element={<Unauthorized />} /> 
 
-            {/* Protected Routes */}
+            {/* ---------- Root (Auto Role Redirect) ---------- */}
             <Route
               path="/"
               element={
@@ -65,21 +72,51 @@ function App() {
               }
             />
 
-            {/* Manager Routes */}
+            {/* ---------- Manager Routes ---------- */}
             <Route
-              path="/client-requirements"
+              path="/projects"
               element={
-                <ProtectedRoute allowedRoles={['Manager']}>
+                <ProtectedRoute allowedRoles={["Manager"]}>
                   <AppShell>
-                    <ClientIntakePage />
+                    <ProjectsPage />
                   </AppShell>
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/spaces/:projectId"
+              element={
+                <ProtectedRoute allowedRoles={["Manager"]}>
+                  <AppShell>
+                    <ProjectSpacesPage />
+                  </AppShell>
+                </ProtectedRoute>
+              }
+            />
+
+            <Route
+              path="/projects/fields"
+              element={
+                <ProtectedRoute allowedRoles={["Manager"]}>
+                  <AppShell>
+                    <ProjectFieldsPage />
+                  </AppShell>
+                </ProtectedRoute>
+              }
+            />
+
+            <Route
+              path="/client-intake"
+              element={
+                <ProtectedRoute allowedRoles={["Manager"]}>
+                  <ClientIntakePage />
                 </ProtectedRoute>
               }
             />
             <Route
               path="/employees"
               element={
-                <ProtectedRoute allowedRoles={['Manager']}>
+                <ProtectedRoute allowedRoles={["Manager"]}>
                   <AppShell>
                     <EmployeesPage />
                   </AppShell>
@@ -89,7 +126,7 @@ function App() {
             <Route
               path="/manager-board"
               element={
-                <ProtectedRoute allowedRoles={['Manager']}>
+                <ProtectedRoute allowedRoles={["Manager"]}>
                   <AppShell>
                     <ManagerBoard />
                   </AppShell>
@@ -99,7 +136,7 @@ function App() {
             <Route
               path="/assign-task"
               element={
-                <ProtectedRoute allowedRoles={['Manager']}>
+                <ProtectedRoute allowedRoles={["Manager"]}>
                   <AppShell>
                     <AssignTaskPage />
                   </AppShell>
@@ -109,7 +146,7 @@ function App() {
             <Route
               path="/attendance-salary"
               element={
-                <ProtectedRoute allowedRoles={['Manager']}>
+                <ProtectedRoute allowedRoles={["Manager"]}>
                   <AppShell>
                     <AttendanceSalaryPage />
                   </AppShell>
@@ -119,7 +156,7 @@ function App() {
             <Route
               path="/all-tasks"
               element={
-                <ProtectedRoute allowedRoles={['Manager']}>
+                <ProtectedRoute allowedRoles={["Manager"]}>
                   <AppShell>
                     <AllTasksPage />
                   </AppShell>
@@ -129,7 +166,7 @@ function App() {
             <Route
               path="/task-history"
               element={
-                <ProtectedRoute allowedRoles={['Manager']}>
+                <ProtectedRoute allowedRoles={["Manager"]}>
                   <AppShell>
                     <TaskHistoryPage />
                   </AppShell>
@@ -137,13 +174,13 @@ function App() {
               }
             />
 
-            {/* HR Routes */}
+            {/* ---------- HR Routes ---------- */}
             <Route
               path="/employee-directory"
               element={
-                <ProtectedRoute allowedRoles={['HR']}>
+                <ProtectedRoute allowedRoles={["HR"]}>
                   <AppShell>
-                    <PlaceholderPage title="Employee Directory" />
+                    <EmployeeDirectoryPage />
                   </AppShell>
                 </ProtectedRoute>
               }
@@ -151,9 +188,9 @@ function App() {
             <Route
               path="/attendance-management"
               element={
-                <ProtectedRoute allowedRoles={['HR']}>
+                <ProtectedRoute allowedRoles={["HR"]}>
                   <AppShell>
-                    <PlaceholderPage title="Attendance Management" />
+                    <AttendanceManagementPage />
                   </AppShell>
                 </ProtectedRoute>
               }
@@ -161,7 +198,7 @@ function App() {
             <Route
               path="/onboarding"
               element={
-                <ProtectedRoute allowedRoles={['HR']}>
+                <ProtectedRoute allowedRoles={["HR"]}>
                   <AppShell>
                     <OnboardingPage />
                   </AppShell>
@@ -171,9 +208,9 @@ function App() {
             <Route
               path="/leave-requests"
               element={
-                <ProtectedRoute allowedRoles={['HR']}>
+                <ProtectedRoute allowedRoles={["HR"]}>
                   <AppShell>
-                    <PlaceholderPage title="Leave Requests" />
+                    <LeaveRequestsPage />
                   </AppShell>
                 </ProtectedRoute>
               }
@@ -181,19 +218,19 @@ function App() {
             <Route
               path="/payroll"
               element={
-                <ProtectedRoute allowedRoles={['HR']}>
+                <ProtectedRoute allowedRoles={["HR"]}>
                   <AppShell>
-                    <PlaceholderPage title="Payroll" />
+                    <PayrollPage />
                   </AppShell>
                 </ProtectedRoute>
               }
             />
 
-            {/* CEO Routes */}
+            {/* ---------- CEO Routes ---------- */}
             <Route
               path="/dashboard"
               element={
-                <ProtectedRoute allowedRoles={['CEO']}>
+                <ProtectedRoute allowedRoles={["CEO"]}>
                   <AppShell>
                     <PlaceholderPage title="Dashboard" />
                   </AppShell>
@@ -203,7 +240,7 @@ function App() {
             <Route
               path="/department-reports"
               element={
-                <ProtectedRoute allowedRoles={['CEO']}>
+                <ProtectedRoute allowedRoles={["CEO"]}>
                   <AppShell>
                     <PlaceholderPage title="Department Reports" />
                   </AppShell>
@@ -213,7 +250,7 @@ function App() {
             <Route
               path="/salaries-overview"
               element={
-                <ProtectedRoute allowedRoles={['CEO']}>
+                <ProtectedRoute allowedRoles={["CEO"]}>
                   <AppShell>
                     <PlaceholderPage title="Salaries Overview" />
                   </AppShell>
@@ -223,7 +260,7 @@ function App() {
             <Route
               path="/top-performers"
               element={
-                <ProtectedRoute allowedRoles={['CEO']}>
+                <ProtectedRoute allowedRoles={["CEO"]}>
                   <AppShell>
                     <PlaceholderPage title="Top Performers" />
                   </AppShell>
@@ -233,7 +270,7 @@ function App() {
             <Route
               path="/task-analytics"
               element={
-                <ProtectedRoute allowedRoles={['CEO']}>
+                <ProtectedRoute allowedRoles={["CEO"]}>
                   <AppShell>
                     <PlaceholderPage title="Task Analytics" />
                   </AppShell>
@@ -241,11 +278,11 @@ function App() {
               }
             />
 
-            {/* Employee Routes */}
+            {/* ---------- Employee Routes ---------- */}
             <Route
               path="/my-tasks"
               element={
-                <ProtectedRoute allowedRoles={['Employee']}>
+                <ProtectedRoute allowedRoles={["Employee"]}>
                   <AppShell>
                     <MyTasksPage />
                   </AppShell>
@@ -255,7 +292,7 @@ function App() {
             <Route
               path="/employee-board"
               element={
-                <ProtectedRoute allowedRoles={['Employee']}>
+                <ProtectedRoute allowedRoles={["Employee"]}>
                   <AppShell>
                     <EmployeeBoardPage />
                   </AppShell>
@@ -265,7 +302,7 @@ function App() {
             <Route
               path="/my-attendance"
               element={
-                <ProtectedRoute allowedRoles={['Employee']}>
+                <ProtectedRoute allowedRoles={["Employee"]}>
                   <AppShell>
                     <PlaceholderPage title="My Attendance" />
                   </AppShell>
@@ -275,7 +312,7 @@ function App() {
             <Route
               path="/my-salary"
               element={
-                <ProtectedRoute allowedRoles={['Employee']}>
+                <ProtectedRoute allowedRoles={["Employee"]}>
                   <AppShell>
                     <PlaceholderPage title="My Salary" />
                   </AppShell>
@@ -285,9 +322,21 @@ function App() {
             <Route
               path="/profile"
               element={
-                <ProtectedRoute allowedRoles={['Employee']}>
+                <ProtectedRoute allowedRoles={["Employee"]}>
                   <AppShell>
                     <PlaceholderPage title="Profile" />
+                  </AppShell>
+                </ProtectedRoute>
+              }
+            />
+
+            {/* ---------- SPACES ROUTE (NEW) ---------- */}
+            <Route
+              path="/spaces/:projectId"
+              element={
+                <ProtectedRoute allowedRoles={["Manager", "Employee", "HR", "CEO"]}>
+                  <AppShell>
+                    <SpacesPage />
                   </AppShell>
                 </ProtectedRoute>
               }

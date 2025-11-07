@@ -1,0 +1,35 @@
+[
+  {
+    "id": "proj001",
+    "name": "E-Commerce Platform",
+    "description": "Full-stack web app for online shopping with integrated payments and analytics.",
+    "status": "Active",
+    "owner": "Manager",
+    "domains": ["Retail", "E-commerce"],
+    "technologies": ["React", "Spring Boot", "MongoDB"],
+    "createdAt": "2025-11-05T10:00:00Z",
+    "updatedAt": "2025-11-05T10:10:00Z"
+  },
+  {
+    "id": "proj002",
+    "name": "Mobile Banking App",
+    "description": "Secure mobile app for online transactions and account management.",
+    "status": "Planning",
+    "owner": "CEO",
+    "domains": ["Finance", "Mobile"],
+    "technologies": ["React Native", "Java", "Firebase"],
+    "createdAt": "2025-11-04T14:20:00Z",
+    "updatedAt": "2025-11-04T15:30:00Z"
+  },
+  {
+    "id": "proj003",
+    "name": "SEO Optimization Service",
+    "description": "Automated keyword tracking and analytics dashboard for SEO clients.",
+    "status": "Completed",
+    "owner": "Manager",
+    "domains": ["Marketing", "SEO"],
+    "technologies": ["Node.js", "MongoDB", "Next.js"],
+    "createdAt": "2025-11-02T09:00:00Z",
+    "updatedAt": "2025-11-03T11:00:00Z"
+  }
+]

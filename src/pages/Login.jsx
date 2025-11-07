@@ -8,6 +8,13 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '../co
 import { Alert, AlertDescription } from '../components/ui/alert';
 import { Eye, EyeOff, Building, Lock, Mail } from 'lucide-react';
 
+const demoAccounts = [
+  { role: 'Manager', email: 'manager@company.com', password: 'manager123' },
+  { role: 'HR', email: 'hr@company.com', password: 'hr123' },
+  { role: 'CEO', email: 'ceo@company.com', password: 'ceo123' },
+  { role: 'Employee', email: 'employee@company.com', password: 'employee123' }
+];
+
 const Login = () => {
   const { login, isAuthenticated } = useAuth();
   const [email, setEmail] = useState('');
@@ -20,36 +27,30 @@ const Login = () => {
     return <Navigate to="/" replace />;
   }
 
-  const handleSubmit = (e) => {
+  const handleSubmit = async (e) => {
     e.preventDefault();
     setError('');
     setLoading(true);
-
-    setTimeout(() => {
-      const result = login(email, password);
-      if (!result.success) {
-        setError(result.error);
-      }
+    try {
+      // If password provided, demo/mocked path runs in AuthContext; if blank, email-only employee check runs
+      const result = await login(email, password || undefined);
+      if (!result.success) setError(result.error || 'Login failed');
+    } finally {
       setLoading(false);
-    }, 500);
+    }
   };
 
-  const demoAccounts = [
-    { role: 'Manager', email: 'manager@company.com', password: 'manager123' },
-    { role: 'HR', email: 'hr@company.com', password: 'hr123' },
-    { role: 'CEO', email: 'ceo@company.com', password: 'ceo123' },
-    { role: 'Employee', email: 'employee@company.com', password: 'employee123' }
-  ];
-
-  const handleDemoLogin = (account) => {
+  const handleDemoLogin = async (account) => {
     setEmail(account.email);
     setPassword(account.password);
-    setTimeout(() => {
-      const result = login(account.email, account.password);
-      if (!result.success) {
-        setError(result.error);
-      }
-    }, 100);
+    setError('');
+    setLoading(true);
+    try {
+      const result = await login(account.email, account.password);
+      if (!result.success) setError(result.error || 'Login failed');
+    } finally {
+      setLoading(false);
+    }
   };
 
   return (
@@ -138,11 +139,10 @@ const Login = () => {
                     <Input
                       id="password"
                       type={showPassword ? 'text' : 'password'}
-                      placeholder="Enter your password"
+                      placeholder="Enter your password (leave blank to sign in with email)"
                       value={password}
                       onChange={(e) => setPassword(e.target.value)}
                       className="pl-10 pr-10"
-                      required
                     />
                     <button
                       type="button"
@@ -152,6 +152,7 @@ const Login = () => {
                       {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
                     </button>
                   </div>
+                  <p className="text-xs text-gray-500">Tip: Leave password empty to sign in with company email (dev only).</p>
                 </div>
 
                 <Button type="submit" className="w-full text-white" disabled={loading}>

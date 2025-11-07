@@ -118,7 +118,7 @@ const Header = () => {
 
         {/* Settings */}
         <Button variant="ghost" size="icon" className="hover:bg-gray-100">
-          <Settings className="w-5 h-5 text-gray-600" />
+          <Settings className="w-5 h-5 text-gray-600" />n
         </Button>
 
         {/* User Info */}

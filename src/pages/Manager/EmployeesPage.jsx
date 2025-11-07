@@ -28,7 +28,7 @@ const api = axios.create({
 });
 
 const EmployeeApi = {
-  list: (page = 0, size = 30) => api.get(`/api/employees?page=${page}&size=${size}`).then(r => r.data),
+  list: (page = 0, size = 30) => api.get(`api//employees?page=${page}&size=${size}`).then(r => r.data),
   getByEmpId: (empId) => api.get(`/api/employees/by-empid/${empId}`).then(r => r.data),
 };
 
