@@ -1,6 +1,5 @@
 import React, { useEffect, useState } from "react";
 import AddTemplateModal from "../../components/AddTemplateModal";
-import mockTemplates from "../../mock/taskTemplates.json";
 
 export default function ProjectFieldsPage() {
   const [templates, setTemplates] = useState([]);
@@ -8,46 +7,37 @@ export default function ProjectFieldsPage() {
   const [showModal, setShowModal] = useState(false);
   const [selectedType, setSelectedType] = useState(null);
   const [editTemplate, setEditTemplate] = useState(null);
-  const [useMockData, setUseMockData] = useState(false);
 
-  // 👤 Mock user role — later replace with AuthContext
+  // 👤 Replace with real auth later
   const userRole = "Manager"; // or "CEO", "Employee"
-  const isManager = ["Manager", "CEO"].includes(userRole);
+  const isManager = ["Manager", "CEO"].includes(userRole); // [web:12]
 
-  // ✅ Fetch templates from backend OR mock
   useEffect(() => {
     const fetchTemplates = async () => {
       try {
-        setLoading(true);
-        const res = await fetch("/api/task-templates");
-
-        if (!res.ok) {
-          console.warn("Backend not reachable, using mock data");
-          setTemplates(mockTemplates);
-          setUseMockData(true);
-          return;
-        }
-
-        const data = await res.json();
-        setTemplates(data);
+        setLoading(true); // [web:6]
+        const res = await fetch("/api/task-templates"); // [web:12]
+        if (!res.ok) throw new Error("Failed to load templates"); // [web:12][web:6]
+        const data = await res.json(); // [web:12]
+        setTemplates(Array.isArray(data) ? data : []); // [web:23]
       } catch (e) {
-        console.warn("Backend not available, switching to mock mode");
-        setTemplates(mockTemplates);
-        setUseMockData(true);
+        console.error("Failed to load task templates", e); // [web:12]
+        setTemplates([]); // [web:6]
       } finally {
-        setLoading(false);
+        setLoading(false); // [web:6]
       }
     };
 
-    fetchTemplates();
+    fetchTemplates(); // [web:23]
   }, []);
 
   // Group by project type
   const grouped = templates.reduce((acc, t) => {
-    if (!acc[t.type]) acc[t.type] = [];
-    acc[t.type].push(t);
+    const key = t.type || "Uncategorized";
+    if (!acc[key]) acc[key] = [];
+    acc[key].push(t);
     return acc;
-  }, {});
+  }, {}); // [web:25][web:29]
 
   // Modal open/close handlers
   const openAddModal = (type) => {
@@ -62,7 +52,7 @@ export default function ProjectFieldsPage() {
     setShowModal(true);
   };
 
-  // Save new or edited template
+  // Save new or edited template (local optimistic update)
   const handleSave = (savedTemplate) => {
     setTemplates((prev) => {
       const exists = prev.find((t) => t.id === savedTemplate.id);
@@ -71,26 +61,19 @@ export default function ProjectFieldsPage() {
       } else {
         return [...prev, savedTemplate];
       }
-    });
+    }); // [web:23]
     setShowModal(false);
   };
 
-  // Delete field
+  // Delete field (backend only)
   const handleDelete = async (id) => {
     if (!window.confirm("Are you sure you want to delete this field?")) return;
-
-    // In mock mode, just remove from local state
-    if (useMockData) {
-      setTemplates((prev) => prev.filter((t) => t.id !== id));
-      return;
-    }
-
     try {
-      const res = await fetch(`/api/task-templates/${id}`, { method: "DELETE" });
-      if (!res.ok) throw new Error("Failed");
-      setTemplates((prev) => prev.filter((t) => t.id !== id));
+      const res = await fetch(`/api/task-templates/${id}`, { method: "DELETE" }); // [web:12]
+      if (!res.ok) throw new Error("Failed to delete"); // [web:12]
+      setTemplates((prev) => prev.filter((t) => t.id !== id)); // [web:23]
     } catch (e) {
-      alert("Failed to delete field");
+      alert("Failed to delete field"); // [web:12]
     }
   };
 
@@ -98,31 +81,24 @@ export default function ProjectFieldsPage() {
   if (!isManager) {
     return (
       <div className="p-8 text-center">
-        <h2 className="text-xl font-semibold text-zinc-900 mb-2">
-          Access Restricted
-        </h2>
+        <h2 className="text-xl font-semibold text-zinc-900 mb-2">Access Restricted</h2>
         <p className="text-zinc-600">
           You do not have permission to view or modify project fields.
         </p>
       </div>
-    );
+    ); // [web:12]
   }
 
   if (loading) {
     return (
       <div className="p-6 text-center text-zinc-600">Loading project fields...</div>
-    );
+    ); // [web:6]
   }
 
   return (
     <div className="p-6">
       <header className="flex justify-between items-center mb-6">
         <h1 className="text-2xl font-semibold text-zinc-900">Project Fields</h1>
-        {useMockData && (
-          <p className="text-xs text-amber-600 font-medium">
-            ⚠ Backend not detected — using mock data
-          </p>
-        )}
       </header>
 
       {/* Project Type Sections */}
@@ -159,8 +135,7 @@ export default function ProjectFieldsPage() {
                     </p>
                     <div className="text-xs text-zinc-500 mb-3">
                       Role: {t.defaultRole || "—"} • Hours:{" "}
-                      {t.defaultEstimateHours || "—"} •{" "}
-                      {t.priority || "MEDIUM"}
+                      {t.defaultEstimateHours || "—"} • {t.priority || "MEDIUM"}
                     </div>
 
                     <div className="flex justify-end gap-2 text-xs">

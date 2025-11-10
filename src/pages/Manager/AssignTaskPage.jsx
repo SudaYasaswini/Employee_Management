@@ -37,6 +37,10 @@ const EmployeeApi = {
   list: (page = 0, size = 200) => api.get(`/api/employees?page=${page}&size=${size}`).then(r => r.data),
 };
 
+const ProjectsApi = {
+  list: (page = 0, size = 200) => api.get(`/api/projects?page=${page}&size=${size}`).then(r => r.data),
+};
+
 const TaskHistoryApi = {
   create: (payload) => api.post('/api/task-history', payload).then(r => r.data),
 };
@@ -46,6 +50,7 @@ export default function AssignTaskPage() {
   const [formData, setFormData] = useState({
     title: '',
     description: '',
+    project: '',
     assignedTo: '',     // empId
     priority: 'Medium', // client-only
     dueDate: '',
@@ -56,6 +61,9 @@ export default function AssignTaskPage() {
   const [employees, setEmployees] = useState([]); // EmployeeResponse[]
   const [loadingEmps, setLoadingEmps] = useState(false);
 
+  const [projects, setProjects] = useState([]); // ProjectResponse[]
+  const [loadingProjects, setLoadingProjects] = useState(false);
+
   const loadEmployees = async () => {
     setLoadingEmps(true);
     try {
@@ -65,6 +73,22 @@ export default function AssignTaskPage() {
       toast({ title: 'Failed to load employees', description: 'Check API or proxy settings.' });
     } finally {
       setLoadingEmps(false);
+    }
+  };
+
+  useEffect(() => {
+    loadEmployees();
+  }, []);
+
+    const loadProjects = async () => {
+    setLoadingProjects(true);
+    try {
+      const page = await ProjectsApi.list(0, 500);
+      setProjects(page?.content || []);
+    } catch (e) {
+      toast({ title: 'Failed to load projects', description: 'Check API or proxy settings.' });
+    } finally {
+      setLoadingProjects(false);
     }
   };
 
@@ -136,7 +160,7 @@ export default function AssignTaskPage() {
   return (
     <div className="p-6 max-w-4xl mx-auto space-y-6">
       <div>
-        <h1 className="text-3xl font-bold text-gray-900">Assign Task</h1>
+        <h1 className="text-3xl font-bold text-gray-900">Create Story</h1>
         <p className="text-gray-600 mt-1">Create and assign new tasks to employees</p>
       </div>
 
@@ -190,6 +214,26 @@ export default function AssignTaskPage() {
                     {(employees || []).map((emp) => (
                       <SelectItem key={emp.id} value={emp.empId}>
                         {[emp.firstName, emp.lastName].filter(Boolean).join(' ')} — {emp.empId}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="project">Project *</Label>
+                <Select
+                  value={formData.project}
+                  onValueChange={(value) => handleChange('project', value)}
+                  disabled={loadingProjects}
+                >
+                  <SelectTrigger id="project">
+                    <SelectValue placeholder={loadingProjects ? 'Loading...' : 'Select project'} />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {(projects || []).map((project) => (
+                      <SelectItem key={project.id} value={project.projectId}>
+                        {project.name}
                       </SelectItem>
                     ))}
                   </SelectContent>

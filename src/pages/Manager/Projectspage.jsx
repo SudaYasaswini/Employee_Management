@@ -1,10 +1,8 @@
 import React, { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import mockProjects from "../../mock/projects.json"; // ✅ mock fallback
 
-// Simple modal for project details
 function Modal({ open, onClose, children }) {
-  if (!open) return null;
+  if (!open) return null; // [web:10]
   return (
     <div className="fixed inset-0 z-50 grid place-items-center bg-black/40">
       <div className="w-full max-w-2xl rounded-xl bg-white p-5 shadow-xl">
@@ -26,75 +24,47 @@ export default function ProjectsPage() {
   const [projects, setProjects] = useState([]);
   const [detailOpen, setDetailOpen] = useState(false);
   const [selected, setSelected] = useState(null);
-  const [useMockData, setUseMockData] = useState(false);
   const [loading, setLoading] = useState(true);
   const navigate = useNavigate();
 
-  // ✅ Try to load projects from backend, fallback to mock if not available
   const load = async () => {
-  console.log("🔍 Loading projects...");
-
     try {
-      const res = await fetch(`/api/projects?page=0&size=50`);
-
-      // Force an error if backend not running or not returning 200
-      if (!res.ok) throw new Error("Backend not reachable");
-
-      const page = await res.json();
-      const content = Array.isArray(page?.content) ? page.content : [];
-      console.log("✅ Loaded backend projects:", content);
-      if (content.length === 0) throw new Error("Empty backend response");
-
+      const res = await fetch(`/api/projects?page=0&size=50`); // [web:12][web:6]
+      if (!res.ok) throw new Error("Failed to load projects"); // [web:12][web:6]
+      const page = await res.json(); // [web:12]
+      const content = Array.isArray(page?.content) ? page.content : []; // [web:18]
       setProjects(content);
-      setUseMockData(false); // ✅ Backend working
     } catch (err) {
-      console.warn("⚠ Falling back to mock projects:", err.message);
-      const storedMock = JSON.parse(localStorage.getItem("mockProjects") || "[]");
-
-      if (storedMock.length > 0) {
-        console.log("✅ Loaded mock projects:", storedMock);
-        setProjects(storedMock);
-        setUseMockData(true); // ✅ Mark mock mode
-      } else {
-        console.log("❌ No mock projects found");
-        setProjects([]); // avoid infinite loading
-        setUseMockData(true);
-      }
+      console.error("Failed to load projects:", err); // [web:12]
+      setProjects([]); // [web:6]
     } finally {
-      setLoading(false); // ✅ Always stop loading
+      setLoading(false); // [web:6]
     }
   };
 
   useEffect(() => {
-    load();
+    load(); // [web:18]
   }, []);
 
   const openDetail = async (id) => {
-    if (useMockData) {
-      const p = projects.find((x) => x.id === id);
-      setSelected(p);
-      setDetailOpen(true);
-      return;
-    }
-
     try {
-      const res = await fetch(`/api/projects/${id}`);
-      if (!res.ok) return;
-      const p = await res.json();
+      const res = await fetch(`/api/projects/${id}`); // [web:12]
+      if (!res.ok) return; // [web:12]
+      const p = await res.json(); // [web:12]
       setSelected(p);
       setDetailOpen(true);
     } catch (err) {
-      console.error("Failed to load project details");
+      console.error("Failed to load project details", err); // [web:12]
     }
   };
 
   const openCreateIntake = () => {
-    window.open("/client-intake", "_blank", "noopener");
+    window.open("/client-intake", "_blank", "noopener"); // [web:10]
   };
 
   if (loading) {
     return (
-      <div className="p-6 text-center text-zinc-600">Loading projects...</div>
+      <div className="p-6 text-center text-zinc-600">Loading projects...</div> // [web:6]
     );
   }
 
@@ -103,17 +73,9 @@ export default function ProjectsPage() {
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-3xl font-bold text-gray-900">Projects</h1>
-          <p className="text-gray-600 mt-1">
-            Browse and manage projects
-          </p>
-          {useMockData && (
-            <p className="text-xs text-amber-600 mt-1 font-medium">
-              ⚠ Backend not detected — displaying mock projects
-            </p>
-          )}
+          <p className="text-gray-600 mt-1">Browse and manage projects</p>
         </div>
 
-        {/* Button group */}
         <div className="flex items-center gap-2">
           <button
             type="button"
@@ -132,7 +94,6 @@ export default function ProjectsPage() {
         </div>
       </div>
 
-      {/* Projects grid */}
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
         {projects.map((p) => (
           <div
@@ -150,9 +111,7 @@ export default function ProjectsPage() {
             </div>
             <div className="text-xs text-zinc-400 mt-1">
               Created:{" "}
-              {p.createdAt
-                ? new Date(p.createdAt).toLocaleString()
-                : "—"}
+              {p.createdAt ? new Date(p.createdAt).toLocaleString() : "—"}
             </div>
           </div>
         ))}
@@ -164,7 +123,6 @@ export default function ProjectsPage() {
         )}
       </div>
 
-      {/* Project details modal */}
       <Modal open={detailOpen} onClose={() => setDetailOpen(false)}>
         {!selected ? (
           <div className="text-sm text-zinc-500">Loading...</div>

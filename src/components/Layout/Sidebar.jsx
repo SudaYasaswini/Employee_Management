@@ -22,20 +22,13 @@ import {
 import { Avatar, AvatarFallback, AvatarImage } from '../ui/avatar';
 import { Button } from '../ui/button';
 
-// // ---------- Fetch Projects ----------
-// async function fetchProjects() {
-//   const res = await fetch('/api/projects?page=0&size=500');
-//   if (!res.ok) throw new Error(`projects fetch failed: ${res.status}`);
-//   return res.json();
-// }
-
 // ---------- Menu Configuration ----------
 const menuConfig = {
   Manager: [
     { path: '/projects', label: 'Projects', icon: Users },
     { path: '/employees', label: 'Employees', icon: Users },
     { path: '/manager-board', label: 'Manager Board', icon: Users },
-    { path: '/assign-task', label: 'Assign Task', icon: ClipboardList },
+    { path: '/assign-task', label: 'Create Stroy', icon: ClipboardList },
     { path: '/attendance-salary', label: 'Attendance & Salary', icon: Calendar },
     { path: '/all-tasks', label: 'All Tasks', icon: FileText },
     { path: '/task-history', label: 'Task History', icon: History },
@@ -48,6 +41,12 @@ const menuConfig = {
     { path: '/payroll', label: 'Payroll', icon: DollarSign },
   ],
   CEO: [
+    { path: '/projects', label: 'Projects', icon: Users },
+    { path: '/employees', label: 'Employees', icon: Users },
+    { path: '/assign-task', label: 'Create Stroy', icon: ClipboardList },
+    { path: '/attendance-salary', label: 'Attendance & Salary', icon: Calendar },
+    { path: '/all-tasks', label: 'All Tasks', icon: FileText },
+    { path: '/task-history', label: 'Task History', icon: History },
     { path: '/dashboard', label: 'Dashboard', icon: LayoutDashboard },
     { path: '/department-reports', label: 'Department Reports', icon: Building },
     { path: '/salaries-overview', label: 'Salaries Overview', icon: DollarSign },
@@ -102,7 +101,7 @@ function ExpandableSection({ title, projects, collapsed, location, user }) {
           )}
           {filteredProjects.map((p) => {
             const to = `/spaces/${p.id}`;
-            const active = location.pathname.startsWith(to);
+            const active = location.pathname.startsWith(to); // active highlight via useLocation
             return (
               <li key={p.id}>
                 <Link
@@ -136,46 +135,36 @@ const Sidebar = () => {
   const [projects, setProjects] = useState([]);
   const [loadingProjects, setLoadingProjects] = useState(false);
 
-  const menuItems = menuConfig[user?.role] || [];
+  const menuItems = menuConfig[user?.role] || []; // role-based menu rendering
 
-  // Load projects (mock first, backend later)
   useEffect(() => {
+    let abort = false;
+
     const loadProjects = async () => {
       try {
         setLoadingProjects(true);
-        // ✅ Try to fetch from backend
-        const res = await fetch('/api/projects?page=0&size=500');
-        if (!res.ok) throw new Error("Backend unavailable");
+        const res = await fetch('/api/projects?page=0&size=500', { cache: 'no-store' }); // backend-only fetch
+        if (!res.ok) throw new Error('Failed to load projects');
         const page = await res.json();
-        setProjects(page?.content || []);
+        if (!abort) setProjects(Array.isArray(page?.content) ? page.content : []);
       } catch (err) {
-        console.warn("⚠ Backend unavailable, loading from localStorage:", err.message);
-        const stored = JSON.parse(localStorage.getItem("mockProjects") || "[]");
-        console.log("📦 Loaded mock projects:", stored);
-        setProjects(stored);
+        console.error('Failed to load projects', err); // no mock fallback
+        if (!abort) setProjects([]);
       } finally {
-        setLoadingProjects(false);
+        if (!abort) setLoadingProjects(false);
       }
     };
 
     loadProjects();
-
-    // 🔁 Auto-refresh when a new mock project is created
-    const refresh = () => {
-      const updated = JSON.parse(localStorage.getItem("mockProjects") || "[]");
-      setProjects(updated);
+    return () => {
+      abort = true;
     };
-    window.addEventListener("mockProjectCreated", refresh);
-    return () => window.removeEventListener("mockProjectCreated", refresh);
   }, []);
 
-
   const getInitials = (name) =>
-    name
-      ?.split(' ')
-      .map((n) => n[0])
-      .join('')
-      .toUpperCase();
+    name?.split(' ').map((n) => n[0]).join('').toUpperCase();
+
+  const hideSpaces = user?.role === 'HR'; // hide Spaces for HR roles
 
   return (
     <div
@@ -199,11 +188,7 @@ const Sidebar = () => {
           onClick={() => setCollapsed(!collapsed)}
           className="text-white hover:bg-slate-700"
         >
-          {collapsed ? (
-            <ChevronRight className="w-5 h-5" />
-          ) : (
-            <ChevronLeft className="w-5 h-5" />
-          )}
+          {collapsed ? <ChevronRight className="w-5 h-5" /> : <ChevronLeft className="w-5 h-5" />}
         </Button>
       </div>
 
@@ -213,7 +198,7 @@ const Sidebar = () => {
           <Avatar className="w-10 h-10">
             <AvatarImage src={user?.avatar} />
             <AvatarFallback className="bg-blue-600">
-              {user?.name ? getInitials(user.name) : 'U'}
+              {getInitials(user?.name || 'U')}
             </AvatarFallback>
           </Avatar>
           {!collapsed && (
@@ -228,66 +213,63 @@ const Sidebar = () => {
       {/* Navigation */}
       <nav className="flex-1 overflow-y-auto py-4">
         <ul className="space-y-1 px-2">
-          {/* ---------- SPACES EXPANDABLE ---------- */}
-          <li className="pt-2">
-            <button
-              type="button"
-              onClick={() => setSpacesOpen((v) => !v)}
-              className={`w-full flex items-center ${
-                collapsed ? 'justify-center' : 'justify-between'
-              } px-3 py-2.5 rounded-lg text-slate-300 hover:bg-slate-700 hover:text-white transition-all`}
-              aria-expanded={spacesOpen}
-            >
-              <div className={`flex items-center ${collapsed ? '' : 'space-x-3'}`}>
-                {spacesOpen ? (
-                  <FolderOpen className="w-5 h-5" />
-                ) : (
-                  <FolderPlus className="w-5 h-5" />
-                )}
-                {!collapsed && <span className="text-sm font-medium">Spaces</span>}
-              </div>
-              {!collapsed && (
-                <span className="text-xs text-slate-400">{projects.length}</span>
+          {/* ---------- SPACES (hidden for HR) ---------- */}
+          {!hideSpaces && (
+            <li className="pt-2">
+              <button
+                type="button"
+                onClick={() => setSpacesOpen((v) => !v)}
+                className={`w-full flex items-center ${
+                  collapsed ? 'justify-center' : 'justify-between'
+                } px-3 py-2.5 rounded-lg text-slate-300 hover:bg-slate-700 hover:text-white`}
+              >
+                <div className={`flex items-center ${collapsed ? '' : 'space-x-3'}`}>
+                  {spacesOpen ? (
+                    <FolderOpen className="w-5 h-5" />
+                  ) : (
+                    <FolderPlus className="w-5 h-5" />
+                  )}
+                  {!collapsed && <span className="text-sm font-medium">Spaces</span>}
+                </div>
+                {!collapsed && <span className="text-xs text-slate-400">{projects.length}</span>}
+              </button>
+
+              {spacesOpen && (
+                <ul className={`mt-1 ${collapsed ? 'px-0' : 'px-2'}`}>
+                  {loadingProjects && (
+                    <li
+                      className={`px-3 py-2 text-xs text-slate-400 ${
+                        collapsed ? 'text-center' : ''
+                      }`}
+                    >
+                      Loading…
+                    </li>
+                  )}
+
+                  <ExpandableSection
+                    title="Active Projects"
+                    projects={projects.filter((p) => p.status !== 'COMPLETED')}
+                    collapsed={collapsed}
+                    location={location}
+                    user={user}
+                  />
+
+                  <ExpandableSection
+                    title="Closed Projects"
+                    projects={projects.filter((p) => p.status === 'COMPLETED')}
+                    collapsed={collapsed}
+                    location={location}
+                    user={user}
+                  />
+                </ul>
               )}
-            </button>
-
-            {spacesOpen && (
-              <ul className={`mt-1 ${collapsed ? 'px-0' : 'px-2'}`}>
-                {loadingProjects && (
-                  <li
-                    className={`px-3 py-2 text-xs text-slate-400 ${
-                      collapsed ? 'text-center' : ''
-                    }`}
-                  >
-                    Loading…
-                  </li>
-                )}
-                
-                {/* ACTIVE PROJECTS */}
-                <ExpandableSection
-                  title="Active Projects"
-                  projects={projects.filter((p) => p.status !== 'COMPLETED')}
-                  collapsed={collapsed}
-                  location={location}
-                  user={user}
-                />
-
-                {/* CLOSED PROJECTS */}
-                <ExpandableSection
-                  title="Closed Projects"
-                  projects={projects.filter((p) => p.status === 'COMPLETED')}
-                  collapsed={collapsed}
-                  location={location}
-                  user={user}
-                />
-              </ul>
-            )}
-          </li>
+            </li>
+          )}
 
           {/* ---------- OTHER MENU ITEMS ---------- */}
           {menuItems.map((item) => {
             const Icon = item.icon;
-            const isActive = location.pathname === item.path;
+            const isActive = location.pathname === item.path; // active highlight with useLocation
             return (
               <li key={item.path}>
                 <Link
@@ -299,9 +281,7 @@ const Sidebar = () => {
                   } ${collapsed ? 'justify-center' : ''}`}
                 >
                   <Icon className="w-5 h-5 flex-shrink-0" />
-                  {!collapsed && (
-                    <span className="text-sm font-medium">{item.label}</span>
-                  )}
+                  {!collapsed && <span className="text-sm font-medium">{item.label}</span>}
                 </Link>
               </li>
             );
@@ -309,14 +289,12 @@ const Sidebar = () => {
         </ul>
       </nav>
 
-      {/* ---------- Logout ---------- */}
+      {/* Logout */}
       <div className="p-4 border-t border-slate-700">
         <Button
           onClick={logout}
           variant="ghost"
-          className={`w-full text-slate-300 hover:bg-red-600 hover:text-white transition-colors ${
-            collapsed ? 'px-2' : ''
-          }`}
+          className={`w-full text-slate-300 hover:bg-red-600 hover:text-white ${collapsed ? 'px-2' : ''}`}
         >
           <LogOut className="w-5 h-5" />
           {!collapsed && <span className="ml-2">Logout</span>}

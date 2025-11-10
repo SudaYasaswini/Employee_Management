@@ -10,32 +10,56 @@ export default function SpacesPage() {
   });
 
   const [projects, setProjects] = useState([]);
+  const [loading, setLoading] = useState(true);
   const navigate = useNavigate();
 
+  // Fetch from backend and refresh on custom "projectUpdated" events
   useEffect(() => {
-    const stored = JSON.parse(localStorage.getItem("mockProjects") || "[]");
-    console.log("📦 Loaded mock projects:", stored);
-    setProjects(stored);
+    let abort = false;
 
-    const refresh = () => {
-      const updated = JSON.parse(localStorage.getItem("mockProjects") || "[]");
-      console.log("🔄 Refreshed mock projects:", updated);
-      setProjects(updated);
+    const load = async () => {
+      try {
+        setLoading(true); // [web:46]
+        const res = await fetch(`/api/projects?page=0&size=100`); // [web:54]
+        if (!res.ok) throw new Error("Failed to load projects"); // [web:54]
+        const page = await res.json(); // [web:54]
+        const content = Array.isArray(page?.content) ? page.content : []; // [web:42]
+        if (!abort) setProjects(content); // [web:46]
+      } catch (e) {
+        console.error("Failed to load projects", e); // [web:54]
+        if (!abort) setProjects([]); // [web:43]
+      } finally {
+        if (!abort) setLoading(false); // [web:46]
+      }
     };
 
-    window.addEventListener("mockProjectCreated", refresh);
-    return () => window.removeEventListener("mockProjectCreated", refresh);
+    load(); // [web:54]
+
+    // Optional: listen for app-level events to refetch (replace with your emitter if any)
+    const handleProjectUpdated = () => load(); // [web:45][web:51]
+    window.addEventListener("projectUpdated", handleProjectUpdated); // [web:53]
+
+    return () => {
+      abort = true; // [web:49]
+      window.removeEventListener("projectUpdated", handleProjectUpdated); // [web:53]
+    };
   }, []);
 
-  // ✅ Robust filtering
+  // Filtering
   const activeProjects = projects.filter(
     (p) => !p.status || p.status.toLowerCase() === "active"
-  );
+  ); // [web:43]
   const closedProjects = projects.filter(
     (p) => p.status && p.status.toLowerCase() === "closed"
-  );
+  ); // [web:43]
 
-  const toggle = (key) => setOpen((p) => ({ ...p, [key]: !p[key] }));
+  const toggle = (key) => setOpen((prev) => ({ ...prev, [key]: !prev[key] })); // [web:52]
+
+  if (loading) {
+    return (
+      <div className="text-sm text-gray-500 p-2">Loading spaces...</div>
+    ); // [web:46]
+  }
 
   return (
     <div className="text-sm text-gray-800">

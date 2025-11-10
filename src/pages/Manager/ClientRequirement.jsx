@@ -3,7 +3,6 @@ import { z } from "zod";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useRef, useState, useEffect } from "react";
 import TaskTemplatePicker from "../../components/TaskTemplatePicker";
-import mockTemplates from "../../mock/taskTemplates.json";
 
 // ------------------ Validation Schema ------------------
 const RequirementIntakeSchema = z.object({
@@ -15,7 +14,7 @@ const RequirementIntakeSchema = z.object({
     timelineWeeks: z.number().int().positive().optional(),
   }),
   functional: z.object({
-    pagesCsv: z.string().optional(), // Product type selector
+    pagesCsv: z.string().optional(),
   }),
   technical: z.object({
     dbChoice: z.string().optional(),
@@ -56,35 +55,32 @@ export default function ClientIntakePage() {
   const [templates, setTemplates] = useState([]);
   const [selectedTemplateIds, setSelectedTemplateIds] = useState([]);
   const selectedType = useWatch({ control, name: "functional.pagesCsv" });
-  const [useMockData, setUseMockData] = useState(false);
 
   // ---------- Scroll Helpers ----------
   const scrollYRef = useRef(0);
   const saveScroll = () => {
-    if (typeof window !== "undefined") scrollYRef.current = window.scrollY;
+    if (typeof window !== "undefined") scrollYRef.current = window.scrollY; // [web:52]
   };
   const restoreScroll = () => {
     if (typeof window !== "undefined")
-      requestAnimationFrame(() => window.scrollTo({ top: scrollYRef.current }));
+      requestAnimationFrame(() => window.scrollTo({ top: scrollYRef.current })); // [web:52]
   };
 
-  const preventDefault = (e) => e.preventDefault();
+  const preventDefault = (e) => e.preventDefault(); // [web:52]
   const onDrop = (e) => {
     e.preventDefault();
-    setFiles((prev) => [...prev, ...Array.from(e.dataTransfer.files || [])]);
+    setFiles((prev) => [...prev, ...Array.from(e.dataTransfer.files || [])]); // [web:106]
   };
   const onPick = (e) => {
-    setFiles((prev) => [...prev, ...Array.from(e.target.files || [])]);
+    setFiles((prev) => [...prev, ...Array.from(e.target.files || [])]); // [web:106]
   };
 
   const Section = ({ title, children }) => (
     <section className="rounded-xl border border-zinc-200 bg-white p-6 shadow-sm">
-      <h3 className="mb-4 font-semibold tracking-tight text-zinc-900">
-        {title}
-      </h3>
+      <h3 className="mb-4 font-semibold tracking-tight text-zinc-900">{title}</h3>
       <div className="grid gap-4">{children}</div>
     </section>
-  );
+  ); // [web:130]
 
   const inputBase =
     "w-full rounded-lg border border-zinc-300 bg-white px-3 py-2 text-zinc-900 placeholder-zinc-400 shadow-sm outline-none transition focus:border-zinc-900 focus:ring-2 focus:ring-zinc-900/10";
@@ -95,62 +91,57 @@ export default function ClientIntakePage() {
   const handleSelectTemplate = (id) => {
     setSelectedTemplateIds((prev) =>
       prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id]
-    );
+    ); // [web:130]
   };
 
-  // ---------- Load Templates ----------
+  // ---------- Load Templates (backend-only) ----------
   useEffect(() => {
     if (!selectedType) {
       setTemplates([]);
       return;
     }
+    let abort = false;
 
     const loadTemplates = async () => {
       try {
         const res = await fetch(
           `/api/task-templates?type=${encodeURIComponent(selectedType)}`
-        );
-        if (!res.ok) throw new Error("Backend not reachable");
-        const data = await res.json();
-        setTemplates(data);
-        setUseMockData(false);
-      } catch {
-        console.warn("⚠ Backend unavailable, loading mock templates");
-        const filtered = mockTemplates.filter((t) => t.type === selectedType);
-        setTemplates(filtered);
-        setUseMockData(true);
+        ); // [web:137]
+        if (!res.ok) throw new Error("Failed to load templates"); // [web:130]
+        const data = await res.json(); // [web:130]
+        if (!abort) setTemplates(Array.isArray(data) ? data : []); // [web:130]
+      } catch (e) {
+        console.error("Failed to load templates", e); // [web:130]
+        if (!abort) setTemplates([]); // [web:130]
       }
     };
 
     loadTemplates();
+    return () => {
+      abort = true; // [web:52]
+    };
   }, [selectedType]);
 
-  // ---------- Submit (with mock fallback) ----------
+  // ---------- Submit (backend-only) ----------
   const onSubmit = async (data) => {
-  try {
-    const formData = new FormData();
-    formData.append("payload", new Blob([JSON.stringify(data)], { type: "application/json" }));
-    files.forEach((f) => formData.append("files", f, f.name));
-
-    let backendAvailable = false;
-    let saved = null;
-
-    // 1️⃣ Try backend first
     try {
-      const res = await fetch(`/api/requirements/intake`, { method: "POST", body: formData });
-      if (res.ok) {
-        backendAvailable = true;
-        saved = await res.json();
-      }
-    } catch {
-      backendAvailable = false;
-    }
+      const formData = new FormData();
+      formData.append(
+        "payload",
+        new Blob([JSON.stringify(data)], { type: "application/json" })
+      ); // [web:106]
+      files.forEach((f) => formData.append("files", f, f.name)); // [web:106]
 
-    // 2️⃣ Handle story templates
-    if (selectedTemplateIds.length) {
-      const selectedTemplates = templates.filter((t) => selectedTemplateIds.includes(t.id));
+      // 1) Create requirement intake
+      const intakeRes = await fetch(`/api/requirements/intake`, {
+        method: "POST",
+        body: formData,
+      }); // [web:57][web:106]
+      if (!intakeRes.ok) throw new Error("Failed to save intake"); // [web:130]
+      const saved = await intakeRes.json(); // [web:57]
 
-      if (backendAvailable && saved) {
+      // 2) Create stories from selected templates (optional)
+      if (selectedTemplateIds.length) {
         try {
           await fetch(`/api/stories/from-templates`, {
             method: "POST",
@@ -162,64 +153,19 @@ export default function ClientIntakePage() {
               intakePayload: data,
               createdBy: "manager",
             }),
-          });
-        } catch {
-          alert("Saved intake, but failed to create backlog stories.");
+          }); // [web:57]
+        } catch (e) {
+          console.error("Failed to create backlog stories from templates", e); // [web:130]
+          alert("Saved intake, but failed to create backlog stories."); // [web:130]
         }
-      } else {
-        console.log("🧩 Backend unavailable — creating mock backlog stories...");
       }
+
+      alert("✅ Saved successfully!"); // [web:130]
+    } catch (e) {
+      console.error("❌ Save failed:", e); // [web:130]
+      alert("❌ Save failed — please try again."); // [web:130]
     }
-
-    // 3️⃣ Save to mock storage when backend is offline
-    if (!backendAvailable) {
-      const mockProjects = JSON.parse(localStorage.getItem("mockProjects") || "[]");
-      const mockStories = JSON.parse(localStorage.getItem("mockStories") || "[]");
-
-      // Create a mock project entry
-      const newProjectId = `mock_project_${Date.now()}`;
-      const newProject = {
-        id: newProjectId,
-        name: data.clientInfo.projectname || "Untitled Project",
-        description: `Type: ${data.functional.pagesCsv || "N/A"}`,
-        status: "Active",
-        owner: "Manager",
-        createdAt: new Date().toISOString(),
-        updatedAt: new Date().toISOString(),
-      };
-
-      mockProjects.push(newProject);
-      localStorage.setItem("mockProjects", JSON.stringify(mockProjects));
-
-      // Generate mock stories linked to this project
-      const selectedTemplates = templates.filter((t) => selectedTemplateIds.includes(t.id));
-      selectedTemplates.forEach((template) => {
-        mockStories.push({
-          id: `mock_story_${Date.now()}_${Math.random().toString(36).substring(2, 8)}`,
-          projectId: newProject.id,
-          title: template?.title || "Untitled Task",
-          description: template?.description || "No description",
-          status: "BACKLOG",
-          assigneeId: null,
-          assigneeName: null,
-          createdAt: new Date().toISOString(),
-        });
-      });
-      localStorage.setItem("mockStories", JSON.stringify(mockStories));
-
-      // Dispatch event so projects/spaces auto-refresh
-      window.dispatchEvent(new Event("mockProjectCreated"));
-
-      alert("✅ Saved successfully (mock mode — backend offline)");
-    } else {
-      alert("✅ Saved successfully!");
-    }
-  } catch (e) {
-    console.error("❌ Save failed:", e);
-    alert("❌ Save failed — check console for details.");
-  }
-};
-
+  };
 
   // ---------- UI ----------
   return (
@@ -233,17 +179,9 @@ export default function ClientIntakePage() {
             <p className="mt-1 text-zinc-600">
               All categories on one page, saved in a single submission.
             </p>
-            {useMockData && (
-              <p className="text-xs text-amber-600 mt-1 font-medium">
-                ⚠ Backend not detected — using mock templates
-              </p>
-            )}
           </header>
 
-          <form
-            onSubmit={handleSubmit(onSubmit)}
-            className="grid grid-cols-1 gap-6"
-          >
+          <form onSubmit={handleSubmit(onSubmit)} className="grid grid-cols-1 gap-6">
             <div className="grid gap-6">
               <Section title="Client Info">
                 <div className={gridTwo}>
@@ -279,22 +217,15 @@ export default function ClientIntakePage() {
                     <option value="" disabled hidden>
                       Select type
                     </option>
-                    <option value="Website Development">
-                      Website Development
-                    </option>
-                    <option value="Mobile App Development">
-                      Mobile App Development
-                    </option>
-                    <option value="E-commerce Development">
-                      E-commerce Development
-                    </option>
+                    <option value="Website Development">Website Development</option>
+                    <option value="Mobile App Development">Mobile App Development</option>
+                    <option value="E-commerce Development">E-commerce Development</option>
                     <option value="SEO Services">SEO Services</option>
                     <option value="Content Creation">Content Creation</option>
                     <option value="Digital Marketing">Digital Marketing</option>
                   </select>
                 </div>
 
-                {/* Dynamic template picker */}
                 {selectedType && (
                   <div className="mt-4">
                     <h4 className="text-sm font-semibold text-zinc-700 mb-2">
@@ -328,10 +259,7 @@ export default function ClientIntakePage() {
                   </div>
                   <div>
                     <label className={labelBase}>Frontend</label>
-                    <select
-                      className={inputBase}
-                      {...register("technical.frontend")}
-                    >
+                    <select className={inputBase} {...register("technical.frontend")}>
                       <option value="" disabled hidden>
                         Select
                       </option>
@@ -341,10 +269,7 @@ export default function ClientIntakePage() {
                   </div>
                   <div>
                     <label className={labelBase}>Backend</label>
-                    <select
-                      className={inputBase}
-                      {...register("technical.backend")}
-                    >
+                    <select className={inputBase} {...register("technical.backend")}>
                       <option value="JAVA">JAVA</option>
                       <option value="PYTHON">PYTHON</option>
                       <option value=".NET">.NET</option>
@@ -353,10 +278,7 @@ export default function ClientIntakePage() {
                   </div>
                   <div>
                     <label className={labelBase}>Frameworks</label>
-                    <select
-                      className={inputBase}
-                      {...register("technical.frameworks")}
-                    >
+                    <select className={inputBase} {...register("technical.frameworks")}>
                       <option value="cloud">cloud</option>
                       <option value="onprem">onprem</option>
                       <option value="hybrid">hybrid</option>
@@ -364,10 +286,7 @@ export default function ClientIntakePage() {
                   </div>
                   <div>
                     <label className={labelBase}>Hosting</label>
-                    <select
-                      className={inputBase}
-                      {...register("technical.hosting")}
-                    >
+                    <select className={inputBase} {...register("technical.hosting")}>
                       <option value="cloud">cloud</option>
                       <option value="onprem">onprem</option>
                       <option value="hybrid">hybrid</option>
@@ -376,16 +295,11 @@ export default function ClientIntakePage() {
                 </div>
 
                 <div className="mt-4 border-t border-zinc-200 pt-4">
-                  <h4 className="font-semibold text-zinc-900 mb-2">
-                    Deployment
-                  </h4>
+                  <h4 className="font-semibold text-zinc-900 mb-2">Deployment</h4>
                   <div className={gridTwo}>
                     <div>
                       <label className={labelBase}>Model</label>
-                      <select
-                        className={inputBase}
-                        {...register("technical.deployModel")}
-                      >
+                      <select className={inputBase} {...register("technical.deployModel")}>
                         <option value="cloud">cloud</option>
                         <option value="onprem">onprem</option>
                         <option value="hybrid">hybrid</option>
@@ -393,10 +307,7 @@ export default function ClientIntakePage() {
                     </div>
                     <div>
                       <label className={labelBase}>Release strategy</label>
-                      <select
-                        className={inputBase}
-                        {...register("technical.releaseStrategy")}
-                      >
+                      <select className={inputBase} {...register("technical.releaseStrategy")}>
                         <option value="continuous">continuous</option>
                         <option value="scheduled">scheduled</option>
                       </select>
@@ -428,7 +339,7 @@ export default function ClientIntakePage() {
                     <select
                       className={inputBase}
                       {...register("uiux.hasWireframes", {
-                        setValueAs: (v) => v === "true", // Convert "true"/"false" → boolean
+                        setValueAs: (v) => v === "true",
                       })}
                     >
                       <option value="false">No</option>
@@ -447,7 +358,6 @@ export default function ClientIntakePage() {
                     <option value="true">Yes</option>
                     <option value="false">No</option>
                   </select>
-
                 </div>
               </Section>
 
@@ -461,12 +371,7 @@ export default function ClientIntakePage() {
                   <p className="text-sm text-zinc-700">
                     Drag & drop files here, or click to browse
                   </p>
-                  <input
-                    type="file"
-                    multiple
-                    onChange={onPick}
-                    className="mt-3 block w-full text-sm"
-                  />
+                  <input type="file" multiple onChange={onPick} className="mt-3 block w-full text-sm" />
                   {files.length > 0 && (
                     <ul className="mt-3 w-full text-left text-xs text-zinc-600 list-disc pl-4">
                       {files.map((f, i) => (
@@ -482,9 +387,7 @@ export default function ClientIntakePage() {
 
               <div className="flex items-center justify-between gap-4">
                 <div className="text-sm text-zinc-600">
-                  {Object.keys(errors ?? {}).length > 0
-                    ? "Fix validation errors"
-                    : " "}
+                  {Object.keys(errors ?? {}).length > 0 ? "Fix validation errors" : " "}
                 </div>
                 <button
                   type="submit"

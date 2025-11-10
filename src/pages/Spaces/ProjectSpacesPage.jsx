@@ -4,55 +4,66 @@ import AssignStoryModal from "./AssignStoryModal";
 import { useParams } from "react-router-dom";
 
 export default function ProjectSpacesPage() {
-  const { projectId } = useParams();
+  const { projectId } = useParams(); // [web:80]
   const [stories, setStories] = useState([]);
   const [assignTarget, setAssignTarget] = useState(null);
-  const [activeTab, setActiveTab] = useState("backlog"); // ✅ track active tab
+  const [activeTab, setActiveTab] = useState("backlog");
   const [project, setProject] = useState(null);
+  const [loading, setLoading] = useState(true);
 
-  // ✅ Load stories from mock or backend
-  const load = async () => {
+  // Load stories from backend
+  const loadStories = async () => {
     try {
-      const res = await fetch(`/api/stories/project/${projectId}`);
-      if (res.ok) {
-        const data = await res.json();
-        setStories(data);
-      } else {
-        throw new Error("Backend not reachable");
-      }
-    } catch {
-      const allStories = JSON.parse(localStorage.getItem("mockStories") || "[]");
-      const filtered = allStories.filter((s) => s.projectId === projectId);
-      setStories(filtered);
+      setLoading(true); // [web:52]
+      const res = await fetch(`/api/stories/project/${projectId}`); // [web:54]
+      if (!res.ok) throw new Error("Failed to load stories"); // [web:54]
+      const data = await res.json(); // [web:54]
+      setStories(Array.isArray(data) ? data : []); // [web:90]
+    } catch (e) {
+      console.error("Failed to load stories", e); // [web:54]
+      setStories([]); // [web:81]
+    } finally {
+      setLoading(false); // [web:52]
     }
   };
 
-  // ✅ Load project details
-  useEffect(() => {
-    const storedProjects = JSON.parse(localStorage.getItem("mockProjects") || "[]");
-    const proj = storedProjects.find((p) => p.id === projectId);
-    setProject(proj || null);
-    load();
-  }, [projectId]);
+  // Load project details from backend
+  const loadProject = async () => {
+    try {
+      const res = await fetch(`/api/projects/${projectId}`); // [web:54]
+      if (!res.ok) throw new Error("Failed to load project"); // [web:54]
+      const p = await res.json(); // [web:54]
+      setProject(p); // [web:52]
+    } catch (e) {
+      console.error("Failed to load project", e); // [web:54]
+      setProject(null); // [web:81]
+    }
+  };
 
-  const backlog = stories.filter((s) => s.status === "BACKLOG");
+  useEffect(() => {
+    if (!projectId) return; // [web:80]
+    loadProject(); // [web:54]
+    loadStories(); // [web:54]
+  }, [projectId]); // [web:89]
+
+  const backlog = stories.filter((s) => s.status === "BACKLOG"); // [web:85][web:90]
   const sprint = stories.filter(
     (s) => s.status === "ASSIGNED" || s.status === "IN_PROGRESS"
-  );
+  ); // [web:85][web:90]
 
   return (
     <div className="p-6 space-y-6">
-      {/* ---------- Header ---------- */}
+      {/* Header */}
       <header className="border-b pb-3">
         <h1 className="text-2xl font-bold text-gray-900">
-          {project?.name || "Project"}
+          {project?.name || "Project"} {/* [web:52] */}
         </h1>
         <p className="text-gray-600 text-sm">
-          {project?.description || "No description"}
+          {project?.description || "No description"} {/* [web:52] */}
         </p>
       </header>
 
-      {/* ---------- Tabs ---------- */}
+      {/* Tabs */}
       <div className="flex items-center border-b border-gray-200">
         <button
           className={`px-4 py-2 text-sm font-medium transition ${
@@ -76,43 +87,49 @@ export default function ProjectSpacesPage() {
         </button>
       </div>
 
-      {/* ---------- Tab Content ---------- */}
-      {activeTab === "backlog" && (
-        <div className="grid sm:grid-cols-2 gap-4 mt-4">
-          {backlog.length ? (
-            backlog.map((s) => (
-              <StoryCard
-                key={s.id}
-                story={s}
-                onAssign={() => setAssignTarget(s)}
-              />
-            ))
-          ) : (
-            <p className="text-sm text-gray-500 mt-4">
-              No backlog stories found.
-            </p>
+      {/* Content */}
+      {loading ? (
+        <p className="text-sm text-gray-500 mt-4">Loading stories...</p> // [web:52]
+      ) : (
+        <>
+          {activeTab === "backlog" && (
+            <div className="grid sm:grid-cols-2 gap-4 mt-4">
+              {backlog.length ? (
+                backlog.map((s) => (
+                  <StoryCard
+                    key={s.id}
+                    story={s}
+                    onAssign={() => setAssignTarget(s)}
+                  />
+                ))
+              ) : (
+                <p className="text-sm text-gray-500 mt-4">
+                  No backlog stories found.
+                </p>
+              )}
+            </div>
           )}
-        </div>
+
+          {activeTab === "sprint" && (
+            <div className="grid sm:grid-cols-2 gap-4 mt-4">
+              {sprint.length ? (
+                sprint.map((s) => <StoryCard key={s.id} story={s} />)
+              ) : (
+                <p className="text-sm text-gray-500 mt-4">
+                  No current sprint stories.
+                </p>
+              )}
+            </div>
+          )}
+        </>
       )}
 
-      {activeTab === "sprint" && (
-        <div className="grid sm:grid-cols-2 gap-4 mt-4">
-          {sprint.length ? (
-            sprint.map((s) => <StoryCard key={s.id} story={s} />)
-          ) : (
-            <p className="text-sm text-gray-500 mt-4">
-              No current sprint stories.
-            </p>
-          )}
-        </div>
-      )}
-
-      {/* ---------- Assign Modal ---------- */}
+      {/* Assign Modal */}
       {assignTarget && (
         <AssignStoryModal
           story={assignTarget}
           onClose={() => setAssignTarget(null)}
-          onAssigned={load}
+          onAssigned={loadStories}
         />
       )}
     </div>
