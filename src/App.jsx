@@ -28,6 +28,7 @@ import SpacesPage from "./pages/SpacesPage";
 // Employee Pages
 import MyTasksPage from "./pages/Employee/MyTasksPage";
 import EmployeeBoardPage from "./pages/Employee/EmployeeBoard";
+import EmployeeAttendancePage from "./pages/Employee/MyAttendancePage";
 
 // HR Pages
 import PayrollPage from "./pages/HR/PayrollPage";
@@ -284,7 +285,7 @@ function App() {
               element={
                 <ProtectedRoute allowedRoles={["Employee"]}>
                   <AppShell>
-                    <PlaceholderPage title="My Attendance" />
+                    <EmployeeAttendancePage />
                   </AppShell>
                 </ProtectedRoute>
               }
