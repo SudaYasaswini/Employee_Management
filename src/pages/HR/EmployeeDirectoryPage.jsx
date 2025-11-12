@@ -1,5 +1,4 @@
-import React, { useState } from 'react';
-import { mockEmployees } from '../../mock';
+import React, { useEffect, useState, useMemo } from 'react';
 import { Users, Search, Filter, Plus, Mail, Phone, Calendar, Edit, Trash2 } from 'lucide-react';
 import { Input } from '../../components/ui/input';
 import { Button } from '../../components/ui/button';
@@ -21,39 +20,80 @@ import {
   TableHeader,
   TableRow,
 } from '../../components/ui/table';
+import axios from 'axios';
+import { toast } from '../../hooks/use-toast';
+import { Toaster } from '../../components/ui/toaster';
+
+// Backend API instance
+const api = axios.create({
+  baseURL: '/',
+  headers: { 'Content-Type': 'application/json' },
+});
+
+const EmployeeApi = {
+  list: (page = 0, size = 50) =>
+    api.get(`/api/employees?page=${page}&size=${size}`).then((r) => r.data),
+};
 
 const EmployeeDirectoryPage = () => {
+  const [employees, setEmployees] = useState([]);
   const [searchQuery, setSearchQuery] = useState('');
   const [departmentFilter, setDepartmentFilter] = useState('all');
   const [statusFilter, setStatusFilter] = useState('all');
-  const [viewMode, setViewMode] = useState('table'); // 'table' or 'grid'
+  const [viewMode, setViewMode] = useState('table');
+  const [loading, setLoading] = useState(false);
 
-  const departments = [...new Set(mockEmployees.map((e) => e.department))];
+  const loadEmployees = async () => {
+    setLoading(true);
+    try {
+      const data = await EmployeeApi.list(0, 100);
+      setEmployees(data?.content || []);
+    } catch (err) {
+      console.error(err);
+      toast({ title: 'Error', description: 'Failed to load employees.' });
+    } finally {
+      setLoading(false);
+    }
+  };
 
-  const filteredEmployees = mockEmployees.filter((emp) => {
-    const matchesSearch =
-      emp.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      emp.employeeId.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      emp.email.toLowerCase().includes(searchQuery.toLowerCase());
-    const matchesDepartment =
-      departmentFilter === 'all' || emp.department === departmentFilter;
-    const matchesStatus = statusFilter === 'all' || emp.status === statusFilter;
-    return matchesSearch && matchesDepartment && matchesStatus;
-  });
+  useEffect(() => {
+    loadEmployees();
+  }, []);
 
-  const getInitials = (name) => {
-    return name
+  // Derive departments from empRole
+  const departments = useMemo(() => {
+    const roles = Array.from(new Set(employees.map((e) => e.empRole).filter(Boolean)));
+    return roles.length ? roles : ['General'];
+  }, [employees]);
+
+  const filteredEmployees = useMemo(() => {
+    const q = searchQuery.trim().toLowerCase();
+    return employees.filter((emp) => {
+      const name = [emp.firstName, emp.lastName].filter(Boolean).join(' ').toLowerCase();
+      const matchesSearch =
+        !q ||
+        name.includes(q) ||
+        String(emp.empId || '').toLowerCase().includes(q) ||
+        String(emp.email || '').toLowerCase().includes(q);
+      const matchesDept =
+        departmentFilter === 'all' || String(emp.empRole || '') === departmentFilter;
+      // Backend has no status; treat all as Active for now
+      const matchesStatus = statusFilter === 'all' || statusFilter === 'Active';
+      return matchesSearch && matchesDept && matchesStatus;
+    });
+  }, [employees, searchQuery, departmentFilter, statusFilter]);
+
+  const getInitials = (name) =>
+    name
       .split(' ')
       .map((n) => n[0])
       .join('')
       .toUpperCase();
-  };
 
-  const getStatusColor = (status) => {
-    return status === 'Active'
+  const getStatusColor = (status) =>
+    status === 'Active'
       ? 'bg-green-100 text-green-800 border-green-200'
       : 'bg-gray-100 text-gray-800 border-gray-200';
-  };
 
   return (
     <div className="p-6 space-y-6">
@@ -62,10 +102,6 @@ const EmployeeDirectoryPage = () => {
           <h1 className="text-3xl font-bold text-gray-900">Employee Directory</h1>
           <p className="text-gray-600 mt-1">Manage employee records and information</p>
         </div>
-        <Button className="flex items-center space-x-2">
-          <Plus className="w-4 h-4" />
-          <span>Add Employee</span>
-        </Button>
       </div>
 
       {/* Stats Cards */}
@@ -75,7 +111,7 @@ const EmployeeDirectoryPage = () => {
             <div className="flex items-center justify-between">
               <div>
                 <p className="text-sm text-gray-600">Total Employees</p>
-                <p className="text-2xl font-bold text-gray-900">{mockEmployees.length}</p>
+                <p className="text-2xl font-bold text-gray-900">{employees.length}</p>
               </div>
               <div className="w-12 h-12 bg-blue-100 rounded-lg flex items-center justify-center">
                 <Users className="w-6 h-6 text-blue-600" />
@@ -88,9 +124,7 @@ const EmployeeDirectoryPage = () => {
             <div className="flex items-center justify-between">
               <div>
                 <p className="text-sm text-gray-600">Active</p>
-                <p className="text-2xl font-bold text-green-600">
-                  {mockEmployees.filter((e) => e.status === 'Active').length}
-                </p>
+                <p className="text-2xl font-bold text-green-600">{employees.length}</p>
               </div>
               <div className="w-12 h-12 bg-green-100 rounded-lg flex items-center justify-center">
                 <span className="text-xl">✓</span>
@@ -116,7 +150,7 @@ const EmployeeDirectoryPage = () => {
             <div className="flex items-center justify-between">
               <div>
                 <p className="text-sm text-gray-600">New This Month</p>
-                <p className="text-2xl font-bold text-orange-600">3</p>
+                <p className="text-2xl font-bold text-orange-600">—</p>
               </div>
               <div className="w-12 h-12 bg-orange-100 rounded-lg flex items-center justify-center">
                 <span className="text-xl">📅</span>
@@ -164,22 +198,6 @@ const EmployeeDirectoryPage = () => {
                 <SelectItem value="Inactive">Inactive</SelectItem>
               </SelectContent>
             </Select>
-            <div className="flex gap-2">
-              <Button
-                variant={viewMode === 'table' ? 'default' : 'outline'}
-                size="icon"
-                onClick={() => setViewMode('table')}
-              >
-                ☰
-              </Button>
-              <Button
-                variant={viewMode === 'grid' ? 'default' : 'outline'}
-                size="icon"
-                onClick={() => setViewMode('grid')}
-              >
-                ⊞
-              </Button>
-            </div>
           </div>
         </CardContent>
       </Card>
@@ -187,76 +205,83 @@ const EmployeeDirectoryPage = () => {
       {/* Employee Table */}
       <Card>
         <CardContent className="p-6">
-          <div className="rounded-lg border">
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>Employee</TableHead>
-                  <TableHead>ID</TableHead>
-                  <TableHead>Department</TableHead>
-                  <TableHead>Position</TableHead>
-                  <TableHead>Contact</TableHead>
-                  <TableHead>Joining Date</TableHead>
-                  <TableHead>Status</TableHead>
-                  <TableHead>Actions</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {filteredEmployees.map((employee) => (
-                  <TableRow key={employee.id}>
-                    <TableCell>
-                      <div className="flex items-center space-x-3">
-                        <Avatar className="w-10 h-10">
-                          <AvatarImage src={employee.avatar} />
-                          <AvatarFallback className="bg-blue-600 text-white">
-                            {getInitials(employee.name)}
-                          </AvatarFallback>
-                        </Avatar>
-                        <div>
-                          <p className="font-medium text-gray-900">{employee.name}</p>
-                          <p className="text-sm text-gray-500">{employee.email}</p>
-                        </div>
-                      </div>
-                    </TableCell>
-                    <TableCell className="font-mono text-sm">{employee.employeeId}</TableCell>
-                    <TableCell>{employee.department}</TableCell>
-                    <TableCell>{employee.position}</TableCell>
-                    <TableCell>
-                      <div className="space-y-1 text-sm">
-                        <div className="flex items-center text-gray-600">
-                          <Phone className="w-3 h-3 mr-2" />
-                          {employee.phone}
-                        </div>
-                      </div>
-                    </TableCell>
-                    <TableCell>
-                      <div className="flex items-center text-sm text-gray-600">
-                        <Calendar className="w-3 h-3 mr-2" />
-                        {new Date(employee.joiningDate).toLocaleDateString()}
-                      </div>
-                    </TableCell>
-                    <TableCell>
-                      <Badge variant="outline" className={getStatusColor(employee.status)}>
-                        {employee.status}
-                      </Badge>
-                    </TableCell>
-                    <TableCell>
-                      <div className="flex items-center space-x-2">
-                        <Button variant="ghost" size="icon" className="h-8 w-8">
-                          <Edit className="w-4 h-4" />
-                        </Button>
-                        <Button variant="ghost" size="icon" className="h-8 w-8 text-red-600">
-                          <Trash2 className="w-4 h-4" />
-                        </Button>
-                      </div>
-                    </TableCell>
+          {loading ? (
+            <p className="text-center text-gray-500">Loading employees...</p>
+          ) : filteredEmployees.length === 0 ? (
+            <p className="text-center text-gray-500 py-6">
+              No employees found matching your criteria
+            </p>
+          ) : (
+            <div className="rounded-lg border overflow-x-auto">
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Employee</TableHead>
+                    <TableHead>ID</TableHead>
+                    <TableHead>Department</TableHead>
+                    <TableHead>Email</TableHead>
+                    <TableHead>Contact</TableHead>
+                    <TableHead>Salary</TableHead>
+                    <TableHead>Status</TableHead>
+                    <TableHead>Actions</TableHead>
                   </TableRow>
-                ))}
-              </TableBody>
-            </Table>
-          </div>
+                </TableHeader>
+                <TableBody>
+                  {filteredEmployees.map((employee) => {
+                    const fullName = [employee.firstName, employee.lastName]
+                      .filter(Boolean)
+                      .join(' ');
+                    return (
+                      <TableRow key={employee.id}>
+                        <TableCell>
+                          <div className="flex items-center space-x-3">
+                            <Avatar className="w-10 h-10">
+                              <AvatarImage src={undefined} />
+                              <AvatarFallback className="bg-blue-600 text-white">
+                                {getInitials(fullName || 'U N')}
+                              </AvatarFallback>
+                            </Avatar>
+                            <div>
+                              <p className="font-medium text-gray-900">{fullName}</p>
+                              <p className="text-sm text-gray-500">{employee.empRole}</p>
+                            </div>
+                          </div>
+                        </TableCell>
+                        <TableCell className="font-mono text-sm">{employee.empId}</TableCell>
+                        <TableCell>{employee.empRole}</TableCell>
+                        <TableCell>{employee.email}</TableCell>
+                        <TableCell>
+                          <div className="flex items-center text-gray-600 text-sm">
+                            <Phone className="w-3 h-3 mr-2" />
+                            {employee.phoneNumber || '—'}
+                          </div>
+                        </TableCell>
+                        <TableCell>
+                          ₹{employee.salary ? employee.salary.toLocaleString() : '—'}
+                        </TableCell>
+                        <TableCell>
+                          <Badge variant="outline" className={getStatusColor('Active')}>
+                            Active
+                          </Badge>
+                        </TableCell>
+                        <TableCell>
+                          <div className="flex items-center space-x-2">
+                            <Button variant="ghost" size="icon" className="h-8 w-8">
+                              <Edit className="w-4 h-4" />
+                            </Button>
+                          </div>
+                        </TableCell>
+                      </TableRow>
+                    );
+                  })}
+                </TableBody>
+              </Table>
+            </div>
+          )}
         </CardContent>
       </Card>
+
+      <Toaster />
     </div>
   );
 };

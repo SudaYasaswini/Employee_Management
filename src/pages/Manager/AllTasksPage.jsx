@@ -1,366 +1,373 @@
-import React, { useEffect, useMemo, useState } from 'react';
-import { ClipboardList, Search, Filter, Eye } from 'lucide-react';
-import { Input } from '../../components/ui/input';
-import { Badge } from '../../components/ui/badge';
-import { Card, CardContent } from '../../components/ui/card';
-import { Progress } from '../../components/ui/progress';
+import React, { useEffect, useState } from "react";
+import axios from "axios";
+import {
+  ClipboardList,
+  Search,
+  Edit,
+  X,
+} from "lucide-react";
+import { Input } from "../../components/ui/input";
+import { Button } from "../../components/ui/button";
 import {
   Select,
   SelectContent,
   SelectItem,
   SelectTrigger,
   SelectValue,
-} from '../../components/ui/select';
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogHeader,
-  DialogTitle,
-} from '../../components/ui/dialog';
-import axios from 'axios';
+} from "../../components/ui/select";
+import { Card, CardContent } from "../../components/ui/card";
+import { Badge } from "../../components/ui/badge";
+import { toast } from "../../hooks/use-toast";
+import { motion } from "framer-motion";
 
-// API
+// API instance
 const api = axios.create({
-  baseURL: '/', // Use Vite proxy to 8083 or set to 'http://localhost:8083'
-  headers: { 'Content-Type': 'application/json' },
+  baseURL: "/", // proxy to backend
+  headers: { "Content-Type": "application/json" },
 });
 
-const TaskHistoryApi = {
-  list: (page = 0, size = 200) => api.get(`/api/task-history?page=${page}&size=${size}`).then(r => r.data),
-};
-
-// Client-only priority/department (until backend supports them)
-const PRIORITY_KEY = 'task_priorities_v1';
-const DEPT_KEY = 'task_departments_v1';
-const getPriorityMap = () => {
-  try { return JSON.parse(localStorage.getItem(PRIORITY_KEY) || '{}'); } catch { return {}; }
-};
-const getDeptMap = () => {
-  try { return JSON.parse(localStorage.getItem(DEPT_KEY) || '{}'); } catch { return {}; }
-};
-
-// Map backend statuses to UI labels/colors used in your page
-const uiStatusFromBackend = (status) => {
-  switch (status) {
-    case 'ASSIGNED': return 'Open';
-    case 'PENDING': return 'In Progress';
-    case 'COMPLETED': return 'Completed';
-    case 'CANCELLED': return 'Cancelled';
-    default: return status || 'Open';
-  }
-};
-
-const backendStatusBuckets = ['ASSIGNED', 'PENDING', 'COMPLETED', 'CANCELLED'];
-
-const getStatusColor = (uiStatus) => {
-  const colors = {
-    Open: 'bg-blue-100 text-blue-800 border-blue-200',
-    'In Progress': 'bg-yellow-100 text-yellow-800 border-yellow-200',
-    Completed: 'bg-green-100 text-green-800 border-green-200',
-    Cancelled: 'bg-gray-100 text-gray-800 border-gray-200',
-  };
-  return colors[uiStatus] || 'bg-gray-100 text-gray-800 border-gray-200';
-};
-
-const getPriorityColor = (priority) => {
-  const colors = {
-    Low: 'bg-gray-100 text-gray-800 border-gray-200',
-    Medium: 'bg-blue-100 text-blue-800 border-blue-200',
-    High: 'bg-red-100 text-red-800 border-red-200',
-    Critical: 'bg-red-100 text-red-800 border-red-200',
-  };
-  return colors[priority] || 'bg-gray-100 text-gray-800 border-gray-200';
-};
-
 export default function AllTasksPage() {
-  const [tasks, setTasks] = useState([]);      // normalized UI tasks
+  const [stories, setStories] = useState([]);
+  const [employees, setEmployees] = useState([]);
   const [loading, setLoading] = useState(false);
+  const [editingId, setEditingId] = useState(null);
+  const [filters, setFilters] = useState({
+    search: "",
+    status: "all",
+    priority: "all",
+  });
 
-  const [searchQuery, setSearchQuery] = useState('');
-  const [statusFilter, setStatusFilter] = useState('all');     // Open | In Progress | Completed | Cancelled
-  const [priorityFilter, setPriorityFilter] = useState('all'); // Low | Medium | High | Critical
+  const statuses = [
+    "BACKLOG",
+    "ASSIGNED",
+    "IN_PROGRESS",
+    "COMPLETED",
+    "CANCELLED",
+  ];
 
-  const [selectedTask, setSelectedTask] = useState(null);
-  const [dialogOpen, setDialogOpen] = useState(false);
+  const priorities = ["LOW", "MEDIUM", "HIGH"];
 
-  const normalize = (rows) => {
-    const pMap = getPriorityMap();
-    const dMap = getDeptMap();
-    return (rows || []).map(t => {
-      const uiStatus = uiStatusFromBackend(t.status);
-      const uiPriority = pMap[t.id] || 'Medium';
-      const uiDepartment = dMap[t.id] || 'General';
-      // Compose a title/description for UI from backend fields
-      return {
-        id: t.id,
-        title: t.taskName,
-        description: t.taskDescription,
-        uiStatus,
-        uiPriority,
-        assignedToName: t.empName,
-        assignedByName: t.taskAssignedBy,
-        department: uiDepartment,
-        dueDate: t.dueDate,
-        createdAt: t.createdAt || t.createdAtDateTime || t.updatedAt || t.updatedAtDateTime,
-        progress: uiStatus === 'Completed' ? 100 : uiStatus === 'In Progress' ? 50 : 0,
-        // keep original for details
-        _raw: t,
-      };
-    });
+  // Badge color styles for priority only
+  const getPriorityColor = (priority) => {
+    switch (priority?.toUpperCase()) {
+      case "HIGH":
+        return "bg-red-100 text-red-700 border-red-300";
+      case "MEDIUM":
+        return "bg-yellow-100 text-yellow-700 border-yellow-300";
+      case "LOW":
+        return "bg-green-100 text-green-700 border-green-300";
+      case "CANCELLED":
+        return "bg-gray-200 text-gray-700 border-gray-300";
+      default:
+        return "bg-gray-100 text-gray-700 border-gray-200";
+    }
   };
 
-  const load = async (p = 0) => {
-    setLoading(true);
+  const badgeColors = {
+    BACKLOG: "bg-gray-100 text-gray-700 border-gray-200",
+    ASSIGNED: "bg-blue-100 text-blue-700 border-blue-200",
+    IN_PROGRESS: "bg-amber-100 text-amber-700 border-amber-200",
+    COMPLETED: "bg-green-100 text-green-700 border-green-200",
+    CANCELLED: "bg-gray-200 text-gray-700 border-gray-300",
+  };
+
+  // Fetch stories
+  const loadStories = async () => {
     try {
-      const page = await TaskHistoryApi.list(p, 500);
-      setTasks(normalize(page?.content || []));
+      setLoading(true);
+      const res = await api.get("/api/story-table");
+      setStories(Array.isArray(res.data) ? res.data : []);
     } catch (e) {
-      setTasks([]);
+      toast({
+        title: "Error loading stories",
+        description: e.message,
+      });
     } finally {
       setLoading(false);
     }
   };
 
-  useEffect(() => {
-    load(0);
-  }, []);
-
-  const filteredTasks = useMemo(() => {
-    const q = searchQuery.trim().toLowerCase();
-    return tasks.filter((task) => {
-      const matchesSearch =
-        !q ||
-        (task.title || '').toLowerCase().includes(q) ||
-        (task.assignedToName || '').toLowerCase().includes(q);
-      const matchesStatus = statusFilter === 'all' || task.uiStatus === statusFilter;
-      const matchesPriority = priorityFilter === 'all' || task.uiPriority === priorityFilter;
-      return matchesSearch && matchesStatus && matchesPriority;
-    });
-  }, [tasks, searchQuery, statusFilter, priorityFilter]);
-
-  const handleViewTask = (task) => {
-    setSelectedTask(task);
-    setDialogOpen(true);
+  // Fetch employees
+  const loadEmployees = async () => {
+    try {
+      const res = await api.get("/api/employees");
+      setEmployees(Array.isArray(res.data) ? res.data : res.data?.content || []);
+    } catch (e) {
+      console.error("Failed to load employees", e);
+    }
   };
 
-  const taskStats = useMemo(() => {
-    const total = tasks.length;
-    const open = tasks.filter(t => t.uiStatus === 'Open').length;
-    const inProgress = tasks.filter(t => t.uiStatus === 'In Progress').length;
-    const completed = tasks.filter(t => t.uiStatus === 'Completed').length;
-    return { total, open, inProgress, completed };
-  }, [tasks]);
+  useEffect(() => {
+    loadStories();
+    loadEmployees();
+  }, []);
+
+  const handleUpdate = async (id, field, value) => {
+    try {
+      const story = stories.find((s) => s.id === id);
+      if (!story) return;
+      const updated = { ...story, [field]: value };
+
+      await api.put(`/api/story-table/${id}`, updated);
+      toast({
+        title: "Story Updated",
+        description: `${field} updated successfully.`,
+      });
+
+      setStories((prev) =>
+        prev.map((s) => (s.id === id ? { ...s, [field]: value } : s))
+      );
+    } catch (err) {
+      toast({
+        title: "Update failed",
+        description:
+          err?.response?.data?.message ||
+          err?.response?.data?.error ||
+          err.message,
+      });
+    }
+  };
+
+  // Filters
+  const filteredStories = stories.filter((s) => {
+    const matchSearch =
+      !filters.search ||
+      s.taskName?.toLowerCase().includes(filters.search.toLowerCase()) ||
+      s.assignedTo?.toLowerCase().includes(filters.search.toLowerCase()) ||
+      s.project?.toLowerCase().includes(filters.search.toLowerCase());
+    const matchStatus =
+      filters.status === "all" ||
+      s.status?.toUpperCase() === filters.status.toUpperCase();
+    const matchPriority =
+      filters.priority === "all" ||
+      s.priority?.toUpperCase() === filters.priority.toUpperCase();
+    return matchSearch && matchStatus && matchPriority;
+  });
 
   return (
     <div className="p-6 space-y-6">
+      {/* Header */}
       <div>
-        <h1 className="text-3xl font-bold text-gray-900">All Tasks</h1>
-        <p className="text-gray-600 mt-1">View and manage all assigned tasks</p>
-      </div>
-
-      {/* Stats Cards */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-        <Card>
-          <CardContent className="p-4">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm text-gray-600">Total Tasks</p>
-                <p className="text-2xl font-bold text-gray-900">{taskStats.total}</p>
-              </div>
-              <div className="w-12 h-12 bg-blue-100 rounded-lg flex items-center justify-center">
-                <ClipboardList className="w-6 h-6 text-blue-600" />
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardContent className="p-4">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm text-gray-600">Open</p>
-                <p className="text-2xl font-bold text-blue-600">{taskStats.open}</p>
-              </div>
-              <div className="w-12 h-12 bg-blue-100 rounded-lg flex items-center justify-center">
-                <span className="text-xl">📋</span>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardContent className="p-4">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm text-gray-600">In Progress</p>
-                <p className="text-2xl font-bold text-yellow-600">{taskStats.inProgress}</p>
-              </div>
-              <div className="w-12 h-12 bg-yellow-100 rounded-lg flex items-center justify-center">
-                <span className="text-xl">⏳</span>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardContent className="p-4">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm text-gray-600">Completed</p>
-                <p className="text-2xl font-bold text-green-600">{taskStats.completed}</p>
-              </div>
-              <div className="w-12 h-12 bg-green-100 rounded-lg flex items-center justify-center">
-                <span className="text-xl">✅</span>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
+        <h1 className="text-3xl font-bold text-gray-900 flex items-center gap-2">
+          <ClipboardList className="w-7 h-7 text-blue-600" /> All Stories
+        </h1>
+        <p className="text-gray-600 mt-1">
+          View, filter, and edit all stories across projects
+        </p>
       </div>
 
       {/* Filters */}
-      <Card>
-        <CardContent className="p-4">
-          <div className="flex flex-col sm:flex-row gap-4">
-            <div className="flex-1 relative">
-              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-4 h-4" />
-              <Input
-                type="text"
-                placeholder="Search tasks or employees..."
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-                className="pl-10"
-              />
-            </div>
-            <Select value={statusFilter} onValueChange={setStatusFilter}>
-              <SelectTrigger className="w-full sm:w-[180px]">
-                <Filter className="w-4 h-4 mr-2" />
-                <SelectValue placeholder="Status" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">All Status</SelectItem>
-                <SelectItem value="Open">Open</SelectItem>
-                <SelectItem value="In Progress">In Progress</SelectItem>
-                <SelectItem value="Completed">Completed</SelectItem>
-                <SelectItem value="Cancelled">Cancelled</SelectItem>
-              </SelectContent>
-            </Select>
-            <Select value={priorityFilter} onValueChange={setPriorityFilter}>
-              <SelectTrigger className="w-full sm:w-[180px]">
-                <Filter className="w-4 h-4 mr-2" />
-                <SelectValue placeholder="Priority" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">All Priority</SelectItem>
-                <SelectItem value="Low">Low</SelectItem>
-                <SelectItem value="Medium">Medium</SelectItem>
-                <SelectItem value="High">High</SelectItem>
-                <SelectItem value="Critical">Critical</SelectItem>
-              </SelectContent>
-            </Select>
-          </div>
-        </CardContent>
-      </Card>
+      <div className="flex flex-wrap gap-3 items-center">
+        <div className="flex items-center relative">
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 w-4 h-4" />
+          <Input
+            placeholder="Search stories, employees or projects..."
+            value={filters.search}
+            onChange={(e) =>
+              setFilters((f) => ({ ...f, search: e.target.value }))
+            }
+            className="pl-9 w-72"
+          />
+        </div>
 
-      {/* Task List */}
-      <div className="space-y-3">
-        {filteredTasks.map((task) => (
-          <Card
-            key={task.id}
-            className="hover:shadow-md transition-shadow cursor-pointer"
-            onClick={() => setSelectedTask(task) || setDialogOpen(true)}
-          >
-            <CardContent className="p-6">
-              <div className="flex items-start justify-between mb-3">
-                <div className="flex-1">
-                  <h3 className="text-lg font-semibold text-gray-900 mb-1">{task.title}</h3>
-                  <p className="text-sm text-gray-600 line-clamp-2">{task.description}</p>
-                </div>
-                <div className="flex items-center space-x-2 ml-4">
-                  <Badge variant="outline" className={getPriorityColor(task.uiPriority)}>
-                    {task.uiPriority}
-                  </Badge>
-                  <Badge variant="outline" className={getStatusColor(task.uiStatus)}>
-                    {task.uiStatus}
-                  </Badge>
-                </div>
-              </div>
-              <div className="flex items-center justify-between">
-                <div className="flex items-center space-x-4 text-sm text-gray-600">
-                  <span>Assigned to: <strong>{task.assignedToName}</strong></span>
-                  <span>Department: <strong>{task.department}</strong></span>
-                  <span>Due: <strong>{task.dueDate ? new Date(task.dueDate).toLocaleDateString() : '—'}</strong></span>
-                </div>
-                <div className="flex items-center space-x-3">
-                  <div className="flex items-center space-x-2">
-                    <Progress value={task.progress} className="w-24" />
-                    <span className="text-sm font-medium text-gray-700">{task.progress}%</span>
-                  </div>
-                  <Eye className="w-4 h-4 text-gray-400" />
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-        ))}
+        {/* Status Filter */}
+        <Select
+          value={filters.status}
+          onValueChange={(v) => setFilters((f) => ({ ...f, status: v }))}
+        >
+          <SelectTrigger className="w-40 bg-white border border-gray-200 shadow-sm">
+            <SelectValue placeholder="Filter by Status" />
+          </SelectTrigger>
+          <SelectContent className="bg-white shadow-lg border border-gray-200 rounded-md">
+            <SelectItem value="all">All Status</SelectItem>
+            {statuses.map((s) => (
+              <SelectItem key={s} value={s}>
+                {s}
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+
+        {/* Priority Filter */}
+        <Select
+          value={filters.priority}
+          onValueChange={(v) => setFilters((f) => ({ ...f, priority: v }))}
+        >
+          <SelectTrigger className="w-40 bg-white border border-gray-200 shadow-sm">
+            <SelectValue placeholder="Filter by Priority" />
+          </SelectTrigger>
+          <SelectContent className="bg-white shadow-lg border border-gray-200 rounded-md">
+            <SelectItem value="all">All Priority</SelectItem>
+            {priorities.map((p) => (
+              <SelectItem key={p} value={p}>
+                {p}
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+
+        <Button
+          variant="outline"
+          onClick={() =>
+            setFilters({ search: "", status: "all", priority: "all" })
+          }
+        >
+          Reset Filters
+        </Button>
       </div>
 
-      {/* Task Detail Dialog */}
-      <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
-        <DialogContent className="max-w-2xl">
-          <DialogHeader>
-            <DialogTitle>Task Details</DialogTitle>
-            <DialogDescription>Complete information about the task</DialogDescription>
-          </DialogHeader>
-          {selectedTask && (
-            <div className="space-y-4">
-              <div>
-                <h3 className="text-xl font-bold text-gray-900 mb-2">{selectedTask.title}</h3>
-                <p className="text-gray-600">{selectedTask.description}</p>
-              </div>
-              <div className="flex items-center space-x-2">
-                <Badge variant="outline" className={getStatusColor(selectedTask.uiStatus)}>
-                  {selectedTask.uiStatus}
-                </Badge>
-                <Badge variant="outline" className={getPriorityColor(selectedTask.uiPriority)}>
-                  {selectedTask.uiPriority} Priority
-                </Badge>
-              </div>
-              <div className="grid grid-cols-2 gap-4 pt-4 border-t">
-                <div>
-                  <label className="text-sm font-medium text-gray-500">Assigned To</label>
-                  <p className="mt-1 text-gray-900">{selectedTask.assignedToName}</p>
-                </div>
-                <div>
-                  <label className="text-sm font-medium text-gray-500">Assigned By</label>
-                  <p className="mt-1 text-gray-900">{selectedTask.assignedByName}</p>
-                </div>
-                <div>
-                  <label className="text-sm font-medium text-gray-500">Department</label>
-                  <p className="mt-1 text-gray-900">{selectedTask.department}</p>
-                </div>
-                <div>
-                  <label className="text-sm font-medium text-gray-500">Due Date</label>
-                  <p className="mt-1 text-gray-900">
-                    {selectedTask.dueDate ? new Date(selectedTask.dueDate).toLocaleDateString() : '—'}
-                  </p>
-                </div>
-                <div>
-                  <label className="text-sm font-medium text-gray-500">Created At</label>
-                  <p className="mt-1 text-gray-900">
-                    {selectedTask.createdAt ? new Date(selectedTask.createdAt).toLocaleDateString() : '—'}
-                  </p>
-                </div>
-                <div>
-                  <label className="text-sm font-medium text-gray-500">Progress</label>
-                  <div className="mt-1 flex items-center space-x-2">
-                    <Progress value={selectedTask.progress} className="flex-1" />
-                    <span className="text-sm font-medium text-gray-900">
-                      {selectedTask.progress}%
-                    </span>
+      {/* Stories Grid */}
+      {loading ? (
+        <p className="text-gray-500">Loading stories...</p>
+      ) : filteredStories.length === 0 ? (
+        <p className="text-gray-500 mt-4">No stories found.</p>
+      ) : (
+        <div className="grid gap-5 md:grid-cols-2 lg:grid-cols-3">
+          {filteredStories.map((story) => (
+            <motion.div
+              key={story.id}
+              whileHover={{ scale: 1.02 }}
+              transition={{ duration: 0.2 }}
+            >
+              <Card className="rounded-xl border border-gray-200 bg-white shadow-sm hover:shadow-md transition">
+                <CardContent className="p-5 space-y-3">
+                  <div className="flex justify-between items-start">
+                    <div>
+                      <h3 className="text-lg font-semibold text-gray-900">
+                        {story.taskName}
+                      </h3>
+                      <p className="text-sm text-gray-600">
+                        {story.taskDescription || "No description"}
+                      </p>
+                    </div>
+                    <Edit
+                      className="w-4 h-4 text-gray-400 hover:text-blue-600 cursor-pointer"
+                      onClick={() =>
+                        setEditingId(editingId === story.id ? null : story.id)
+                      }
+                    />
                   </div>
-                </div>
-              </div>
-            </div>
-          )}
-        </DialogContent>
-      </Dialog>
+
+                  <div className="flex flex-wrap gap-2 text-sm text-gray-600">
+                    <Badge
+                      variant="outline"
+                      className={`${badgeColors[story.status] || ""}`}
+                    >
+                      {story.status}
+                    </Badge>
+                    <Badge
+                      variant="outline"
+                      className={getPriorityColor(story.priority)}
+                    >
+                      {story.priority || "N/A"}
+                    </Badge>
+                  </div>
+
+                  {/* Editable Mode */}
+                  {editingId === story.id ? (
+                    <div className="space-y-3 border-t pt-3">
+                      {/* Assigned To */}
+                      <div>
+                        <label className="text-xs text-gray-500">
+                          Assigned To
+                        </label>
+                        <Select
+                          value={story.assignedTo}
+                          onValueChange={(v) =>
+                            handleUpdate(story.id, "assignedTo", v)
+                          }
+                        >
+                          <SelectTrigger className="bg-white border border-gray-200 shadow-sm">
+                            <SelectValue placeholder="Select employee" />
+                          </SelectTrigger>
+                          <SelectContent className="bg-white shadow-md border border-gray-200 rounded-md">
+                            {employees.map((emp) => (
+                              <SelectItem
+                                key={emp.id}
+                                value={`${emp.firstName} ${emp.lastName}`}
+                              >
+                                {emp.firstName} {emp.lastName} ({emp.empRole})
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                      </div>
+
+                      {/* Status */}
+                      <div>
+                        <label className="text-xs text-gray-500">Status</label>
+                        <Select
+                          value={story.status}
+                          onValueChange={(v) =>
+                            handleUpdate(story.id, "status", v)
+                          }
+                        >
+                          <SelectTrigger className="bg-white border border-gray-200 shadow-sm">
+                            <SelectValue placeholder="Select status" />
+                          </SelectTrigger>
+                          <SelectContent className="bg-white shadow-md border border-gray-200 rounded-md">
+                            {statuses.map((s) => (
+                              <SelectItem key={s} value={s}>
+                                {s}
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                      </div>
+
+                      {/* Priority */}
+                      <div>
+                        <label className="text-xs text-gray-500">Priority</label>
+                        <Select
+                          value={story.priority}
+                          onValueChange={(v) =>
+                            handleUpdate(story.id, "priority", v)
+                          }
+                        >
+                          <SelectTrigger className="bg-white border border-gray-200 shadow-sm">
+                            <SelectValue placeholder="Select priority" />
+                          </SelectTrigger>
+                          <SelectContent className="bg-white shadow-md border border-gray-200 rounded-md">
+                            {priorities.map((p) => (
+                              <SelectItem key={p} value={p}>
+                                {p}
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                      </div>
+
+                      <div className="flex justify-end">
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => setEditingId(null)}
+                          className="mt-1"
+                        >
+                          <X className="w-4 h-4 mr-1" /> Close
+                        </Button>
+                      </div>
+                    </div>
+                  ) : (
+                    <div className="space-y-1 text-sm text-gray-700">
+                      <p>
+                        <strong>Assigned To:</strong>{" "}
+                        {story.assignedTo || "Unassigned"}
+                      </p>
+                      <p>
+                        <strong>Project:</strong> {story.project || "—"}
+                      </p>
+                      <p>
+                        <strong>Department:</strong> {story.department || "—"}
+                      </p>
+                    </div>
+                  )}
+                </CardContent>
+              </Card>
+            </motion.div>
+          ))}
+        </div>
+      )}
     </div>
   );
 }

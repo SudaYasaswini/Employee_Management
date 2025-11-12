@@ -1,36 +1,18 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
-import { mockUsers } from '../mock';
 
 const AuthContext = createContext(null);
 
 export const useAuth = () => {
   const context = useContext(AuthContext);
-  if (!context) {
-    throw new Error('useAuth must be used within AuthProvider');
-  }
+  if (!context) throw new Error('useAuth must be used within AuthProvider');
   return context;
 };
-
-// Minimal helper to look up employee email in backend (dev-only)
-async function findEmployeeByEmail(email) {
-  try {
-    const res = await fetch(`/api/employees?page=0&size=500`);
-    if (!res.ok) return null;
-    const data = await res.json();
-    const list = data?.content || [];
-    const emp = list.find((e) => String(e.email).toLowerCase() === String(email).toLowerCase());
-    return emp || null;
-  } catch {
-    return null;
-  }
-}
 
 export const AuthProvider = ({ children }) => {
   const [user, setUser] = useState(null);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    // Check if user is already logged in (from localStorage)
     const storedUser = localStorage.getItem('user');
     if (storedUser) {
       setUser(JSON.parse(storedUser));
@@ -38,38 +20,58 @@ export const AuthProvider = ({ children }) => {
     setLoading(false);
   }, []);
 
-  const login = async (email, password) => {
-    // 1) Existing mock/demos path (unchanged)
-    if (password) {
-      const foundUser = mockUsers.find(
-        (u) => u.email === email && u.password === password
-      );
-      if (foundUser) {
-        const userWithoutPassword = { ...foundUser };
-        delete userWithoutPassword.password;
-        setUser(userWithoutPassword);
-        localStorage.setItem('user', JSON.stringify(userWithoutPassword));
-        return { success: true, user: userWithoutPassword };
+  // 🧠 MAIN LOGIN FUNCTION — uses backend
+  const login = async (empIdOrEmail, password) => {
+    if (!empIdOrEmail || !password) {
+      return { success: false, error: 'Both Emp ID and Password are required' };
+    }
+
+    try {
+      let empId = empIdOrEmail.trim();
+
+      // 🔍 if the user entered an email instead of empId, resolve it to empId
+      if (empId.includes('@')) {
+        const res = await fetch(`/api/employees?page=0&size=500`);
+        if (!res.ok) return { success: false, error: 'Unable to fetch employees' };
+        const data = await res.json();
+        const found = (data.content || []).find(
+          (e) => e.email.toLowerCase() === empId.toLowerCase()
+        );
+        if (!found) return { success: false, error: 'Email not found' };
+        empId = found.empId;
       }
-      // If password supplied but not found in mock, continue to email-only fallback as a convenience
-    }
 
-    // 2) Email-only employee login (dev-only, no backend auth)
-    const emp = await findEmployeeByEmail(email);
-    if (emp) {
-      const employeeUser = {
-        id: emp.id,
-        empId: emp.empId,
-        email: emp.email,
-        name: [emp.firstName, emp.lastName].filter(Boolean).join(' ') || emp.empId,
-        role: 'Employee', // minimal role tagging to keep hasRole working
+      // ✅ Backend login request
+      const res = await fetch('/api/auth/login', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ empId: empId.toUpperCase(), password }),
+      });
+
+      if (!res.ok) {
+        const errText = await res.text();
+        return { success: false, error: errText || 'Invalid credentials' };
+      }
+
+      const loginResp = await res.json(); // { id, empId, email, empRole, message }
+
+      const userData = {
+        id: loginResp.id,
+        empId: loginResp.empId,
+        email: loginResp.email,
+        role: loginResp.empRole,
+        name: `${loginResp.firstName || ""} ${loginResp.lastName || ""}`.trim() || loginResp.empId,
+        message: loginResp.message,
       };
-      setUser(employeeUser);
-      localStorage.setItem('user', JSON.stringify(employeeUser));
-      return { success: true, user: employeeUser };
-    }
 
-    return { success: false, error: 'Invalid email or password' };
+      setUser(userData);
+      localStorage.setItem('user', JSON.stringify(userData));
+
+      return { success: true, user: userData };
+    } catch (err) {
+      console.error('Login error:', err);
+      return { success: false, error: 'Server error during login' };
+    }
   };
 
   const logout = () => {
@@ -79,20 +81,22 @@ export const AuthProvider = ({ children }) => {
 
   const hasRole = (roles) => {
     if (!user) return false;
-    if (Array.isArray(roles)) {
-      return roles.includes(user.role);
-    }
+    if (Array.isArray(roles)) return roles.includes(user.role);
     return user.role === roles;
   };
 
-  const value = {
-    user,
-    login,
-    logout,
-    hasRole,
-    loading,
-    isAuthenticated: !!user
-  };
-
-  return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
+  return (
+    <AuthContext.Provider
+      value={{
+        user,
+        login,
+        logout,
+        hasRole,
+        loading,
+        isAuthenticated: !!user,
+      }}
+    >
+      {children}
+    </AuthContext.Provider>
+  );
 };

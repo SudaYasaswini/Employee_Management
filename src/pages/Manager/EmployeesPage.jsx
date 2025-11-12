@@ -28,9 +28,12 @@ const api = axios.create({
 });
 
 const EmployeeApi = {
-  list: (page = 0, size = 30) => api.get(`api//employees?page=${page}&size=${size}`).then(r => r.data),
-  getByEmpId: (empId) => api.get(`/api/employees/by-empid/${empId}`).then(r => r.data),
+  list: (page = 0, size = 30) =>
+    api.get(`/api/employees?page=${page}&size=${size}`).then((r) => r.data),
+  getByEmpId: (empId) =>
+    api.get(`/api/employees/by-empid/${empId}`).then((r) => r.data),
 };
+
 
 function fullName(e) {
   return [e.firstName, e.lastName].filter(Boolean).join(' ');
@@ -62,8 +65,9 @@ export default function EmployeesPage() {
     setLoading(true);
     try {
       const data = await EmployeeApi.list(p, size);
-      setEmployees(data?.content || []);
-      setTotalPages(data?.totalPages || 0);
+      setEmployees(Array.isArray(data) ? data : data?.content || []);
+      setTotalPages(data?.totalPages || 1);
+
       setPage(p);
     } catch (e) {
       // optional toast

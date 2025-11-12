@@ -86,17 +86,6 @@ function App() {
               }
             />
             <Route
-              path="/spaces/:projectId"
-              element={
-                <ProtectedRoute allowedRoles={["Manager", "Employee", "HR", "CEO"]}>
-                  <AppShell>
-                    <ProjectSpacesPage />
-                  </AppShell>
-                </ProtectedRoute>
-              }
-            />
-
-            <Route
               path="/projects/fields"
               element={
                 <ProtectedRoute allowedRoles={["Manager", "CEO"]}>
@@ -334,11 +323,11 @@ function App() {
 
             {/* ---------- SPACES ROUTE (NEW) ---------- */}
             <Route
-              path="/spaces/:projectId"
+              path="/spaces/:projectId/board"
               element={
-                <ProtectedRoute allowedRoles={["Manager", "Employee", "HR", "CEO"]}>
+                <ProtectedRoute allowedRoles={["Manager", "Employee", "CEO"]}>
                   <AppShell>
-                    <SpacesPage />
+                    <ProjectSpacesPage />
                   </AppShell>
                 </ProtectedRoute>
               }

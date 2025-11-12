@@ -59,20 +59,20 @@ export default function ClientIntakePage() {
   // ---------- Scroll Helpers ----------
   const scrollYRef = useRef(0);
   const saveScroll = () => {
-    if (typeof window !== "undefined") scrollYRef.current = window.scrollY; // [web:52]
+    if (typeof window !== "undefined") scrollYRef.current = window.scrollY;
   };
   const restoreScroll = () => {
     if (typeof window !== "undefined")
-      requestAnimationFrame(() => window.scrollTo({ top: scrollYRef.current })); // [web:52]
+      requestAnimationFrame(() => window.scrollTo({ top: scrollYRef.current }));
   };
 
-  const preventDefault = (e) => e.preventDefault(); // [web:52]
+  const preventDefault = (e) => e.preventDefault();
   const onDrop = (e) => {
     e.preventDefault();
-    setFiles((prev) => [...prev, ...Array.from(e.dataTransfer.files || [])]); // [web:106]
+    setFiles((prev) => [...prev, ...Array.from(e.dataTransfer.files || [])]);
   };
   const onPick = (e) => {
-    setFiles((prev) => [...prev, ...Array.from(e.target.files || [])]); // [web:106]
+    setFiles((prev) => [...prev, ...Array.from(e.target.files || [])]);
   };
 
   const Section = ({ title, children }) => (
@@ -80,7 +80,7 @@ export default function ClientIntakePage() {
       <h3 className="mb-4 font-semibold tracking-tight text-zinc-900">{title}</h3>
       <div className="grid gap-4">{children}</div>
     </section>
-  ); // [web:130]
+  );
 
   const inputBase =
     "w-full rounded-lg border border-zinc-300 bg-white px-3 py-2 text-zinc-900 placeholder-zinc-400 shadow-sm outline-none transition focus:border-zinc-900 focus:ring-2 focus:ring-zinc-900/10";
@@ -91,79 +91,183 @@ export default function ClientIntakePage() {
   const handleSelectTemplate = (id) => {
     setSelectedTemplateIds((prev) =>
       prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id]
-    ); // [web:130]
+    );
   };
 
-  // ---------- Load Templates (backend-only) ----------
+  // ---------- Load Fields Based on Selected Type ----------
   useEffect(() => {
     if (!selectedType) {
       setTemplates([]);
       return;
     }
-    let abort = false;
 
-    const loadTemplates = async () => {
+    const loadFields = async () => {
       try {
-        const res = await fetch(
-          `/api/task-templates?type=${encodeURIComponent(selectedType)}`
-        ); // [web:137]
-        if (!res.ok) throw new Error("Failed to load templates"); // [web:130]
-        const data = await res.json(); // [web:130]
-        if (!abort) setTemplates(Array.isArray(data) ? data : []); // [web:130]
-      } catch (e) {
-        console.error("Failed to load templates", e); // [web:130]
-        if (!abort) setTemplates([]); // [web:130]
+        const res = await fetch("/api/field-table");
+        if (!res.ok) throw new Error("Failed to load fields");
+        const data = await res.json();
+
+        // FRONTEND FILTERING HERE
+        const filtered = data.filter((f) => f.type === selectedType);
+
+        setTemplates(
+          filtered.map((f) => ({
+            id: f.id,
+            title: f.taskName,
+            description: f.taskDescription,
+            defaultRole: f.deptName || "General",
+            defaultEstimateHours: 2,
+          }))
+        );
+      } catch (err) {
+        console.error("❌ Failed to load fields:", err);
+        setTemplates([]);
       }
     };
 
-    loadTemplates();
-    return () => {
-      abort = true; // [web:52]
-    };
+    loadFields();
   }, [selectedType]);
 
-  // ---------- Submit (backend-only) ----------
+  // ---------- Submit (multipart: data + files) ----------
   const onSubmit = async (data) => {
     try {
+      // Build backend payload for client onboarding (keep all existing fields)
+      const payload = {
+        projectId: `PROJ-${Date.now()}`,
+        clientInfo: {
+          businessName: data.clientInfo.businessName,
+          projectName: data.clientInfo.projectname,
+          clientAddress: data.clientInfo.clientAddress || "",
+          businessPhoneNo: data.clientInfo.businessPhoneNo || "",
+        },
+        projectType: {
+          websiteDev:
+            data.functional.pagesCsv === "Website Development" ? "true" : "false",
+          ecommerceApp:
+            data.functional.pagesCsv === "E-commerce Development" ? "true" : "false",
+          mobileApp:
+            data.functional.pagesCsv === "Mobile App Development" ? "true" : "false",
+          seoServices:
+            data.functional.pagesCsv === "SEO Services" ? "true" : "false",
+          contentManagement:
+            data.functional.pagesCsv === "Content Creation" ? "true" : "false",
+          digitalMarketing:
+            data.functional.pagesCsv === "Digital Marketing" ? "true" : "false",
+        },
+        technical: {
+          preferredStack: [],
+          dbChoice: data.technical.dbChoice || "",
+          hosting: data.technical.hosting || "",
+          frontend: data.technical.frontend || "",
+          backend: data.technical.backend || "",
+          frameworks: data.technical.frameworks || "",
+          deployModel: data.technical.deployModel || "",
+          releaseStrategy: data.technical.releaseStrategy || "",
+          supportSla: data.technical.supportSla || "",
+        },
+        uiux: {
+          // keep same shape: join into a string to match earlier behavior
+          brandColors: Array.isArray(data?.uiux?.brandColors)
+            ? data.uiux.brandColors.join(", ")
+            : String(data?.uiux?.brandColors || ""),
+          hasWireframes: !!data?.uiux?.hasWireframes,
+          responsive: !!data?.uiux?.responsive,
+        },
+        // keep fileUploads metadata here (this is optional — controller will override if files present)
+        fileUploads: files.map((f) => ({
+          fileName: f.name,
+          fileType: f.type || "unknown",
+          fileUrl: "", // controller will replace with real URL after uploading
+          fileSize: f.size || 0,
+        })),
+        description: data.description || "",
+        note: data.note || "",
+        contactInfo: {
+          contactName: data.clientInfo.businessName || "",
+          contactNumber: data.clientInfo.businessPhoneNo || "",
+          contactEmail: data.clientInfo.contactEmail || "unknown@company.com",
+          address: data.clientInfo.clientAddress || "",
+        },
+      };
+
+      console.log("📦 Sending payload to backend (multipart):", payload);
+
+      // Build FormData and attach JSON blob + files
       const formData = new FormData();
       formData.append(
-        "payload",
-        new Blob([JSON.stringify(data)], { type: "application/json" })
-      ); // [web:106]
-      files.forEach((f) => formData.append("files", f, f.name)); // [web:106]
+        "data",
+        new Blob([JSON.stringify(payload)], { type: "application/json" }),
+        "data.json"
+      );
 
-      // 1) Create requirement intake
-      const intakeRes = await fetch(`/api/requirements/intake`, {
-        method: "POST",
-        body: formData,
-      }); // [web:57][web:106]
-      if (!intakeRes.ok) throw new Error("Failed to save intake"); // [web:130]
-      const saved = await intakeRes.json(); // [web:57]
 
-      // 2) Create stories from selected templates (optional)
-      if (selectedTemplateIds.length) {
-        try {
-          await fetch(`/api/stories/from-templates`, {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({
-              projectId: saved.projectId,
-              requirementId: saved.id,
-              templateIds: selectedTemplateIds,
-              intakePayload: data,
-              createdBy: "manager",
-            }),
-          }); // [web:57]
-        } catch (e) {
-          console.error("Failed to create backlog stories from templates", e); // [web:130]
-          alert("Saved intake, but failed to create backlog stories."); // [web:130]
-        }
+      if (files && files.length > 0) {
+        files.forEach((file) => {
+          formData.append("files", file);
+        });
       }
 
-      alert("✅ Saved successfully!"); // [web:130]
+      // POST to multipart endpoint
+      const res = await fetch(`/api/client-onboard`, {
+        method: "POST",
+        body: formData, // DO NOT set Content-Type header; let browser set multipart boundary
+      });
+
+      if (!res.ok) {
+        const text = await res.text().catch(() => null);
+        throw new Error(text || "Failed to save client onboarding");
+      }
+
+      const saved = await res.json();
+      console.log("✅ Saved successfully:", saved);
+      alert(
+        `✅ Client Onboard Created Successfully for ${saved.clientInfo?.businessName || saved.projectId}`
+      );
+
+      // Clear selected files after success
+      setFiles([]);
+
+      // 2️⃣ Create stories for each selected field (unchanged logic)
+      if (selectedTemplateIds.length > 0) {
+        console.log("🧩 Creating stories for selected fields...");
+        for (const fieldId of selectedTemplateIds) {
+          try {
+            // Fetch field details
+            const fieldRes = await fetch(`/api/field-table/${fieldId}`);
+            let field = null;
+            if (fieldRes.ok) field = await fieldRes.json();
+
+            const storyPayload = {
+              taskName: field?.taskName || "Feature from Field",
+              taskDescription: field?.taskDescription || "",
+              type: field?.type || "Feature",
+              description: "",
+              assignedTo: "unassigned",
+              project: saved.clientInfo?.projectName || saved.projectId || "",
+              department: field?.deptName || "",
+              priority: field?.priority || "MEDIUM",
+              status: "BACKLOG",
+            };
+
+            const storyRes = await fetch(`/api/story-table`, {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify(storyPayload),
+            });
+
+            if (!storyRes.ok) {
+              console.error(`❌ Failed to create story for field ${fieldId}`);
+            } else {
+              console.log(`✅ Story created for field ${fieldId}`);
+            }
+          } catch (err) {
+            console.error("❌ Error creating story:", err);
+          }
+        }
+      }
     } catch (e) {
-      console.error("❌ Save failed:", e); // [web:130]
-      alert("❌ Save failed — please try again."); // [web:130]
+      console.error("❌ Save failed:", e);
+      alert("❌ Failed to save client onboarding record. Please try again.");
     }
   };
 
@@ -201,6 +305,25 @@ export default function ClientIntakePage() {
                       placeholder="Project Name"
                       {...register("clientInfo.projectname")}
                       onFocus={saveScroll}
+                    />
+                  </div>
+
+                  <div>
+                    <label className={labelBase}>Client Address</label>
+                    <input
+                      className={inputBase}
+                      placeholder="123 Business Street, City"
+                      {...register("clientInfo.clientAddress")}
+                    />
+                  </div>
+
+                  <div>
+                    <label className={labelBase}>Business Phone Number</label>
+                    <input
+                      type="tel"
+                      className={inputBase}
+                      placeholder="9876543210"
+                      {...register("clientInfo.businessPhoneNo")}
                     />
                   </div>
                 </div>
@@ -358,6 +481,64 @@ export default function ClientIntakePage() {
                     <option value="true">Yes</option>
                     <option value="false">No</option>
                   </select>
+                </div>
+              </Section>
+
+              <Section title="Project Description & Notes">
+                <div>
+                  <label className={labelBase}>Description</label>
+                  <textarea
+                    className={`${inputBase} h-24 resize-none`}
+                    placeholder="Describe the project goals and requirements..."
+                    {...register("description")}
+                  />
+                </div>
+                <div>
+                  <label className={labelBase}>Notes</label>
+                  <textarea
+                    className={`${inputBase} h-20 resize-none`}
+                    placeholder="Any additional notes or remarks..."
+                    {...register("note")}
+                  />
+                </div>
+              </Section>
+
+              <Section title="Primary Contact Info">
+                <div className={gridTwo}>
+                  <div>
+                    <label className={labelBase}>Contact Name</label>
+                    <input
+                      className={inputBase}
+                      placeholder="John Doe"
+                      {...register("contactInfo.contactName")}
+                    />
+                  </div>
+                  <div>
+                    <label className={labelBase}>Contact Number</label>
+                    <input
+                      type="tel"
+                      className={inputBase}
+                      placeholder="9876543210"
+                      {...register("contactInfo.contactNumber")}
+                    />
+                  </div>
+                  <div>
+                    <label className={labelBase}>Contact Email</label>
+                    <input
+                      type="email"
+                      className={inputBase}
+                      placeholder="contact@company.com"
+                      {...register("contactInfo.contactEmail")}
+                    />
+                  </div>
+                  <div>
+                    <label className={labelBase}>Contact Address</label>
+                    <input
+                      className={inputBase}
+                      placeholder="Company HQ, City, Country"
+                      {...register("contactInfo.address")}
+                    />
+                  </div>
                 </div>
               </Section>
 

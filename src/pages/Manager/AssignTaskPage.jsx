@@ -38,7 +38,7 @@ const EmployeeApi = {
 };
 
 const ProjectsApi = {
-  list: (page = 0, size = 200) => api.get(`/api/projects?page=${page}&size=${size}`).then(r => r.data),
+  list: () => api.get(`/api/client-onboard`).then(r => r.data),
 };
 
 const TaskHistoryApi = {
@@ -64,11 +64,12 @@ export default function AssignTaskPage() {
   const [projects, setProjects] = useState([]); // ProjectResponse[]
   const [loadingProjects, setLoadingProjects] = useState(false);
 
+  // --- Load Employees ---
   const loadEmployees = async () => {
     setLoadingEmps(true);
     try {
-      const page = await EmployeeApi.list(0, 500);
-      setEmployees(page?.content || []);
+      const data = await EmployeeApi.list(0, 500);
+      setEmployees(Array.isArray(data) ? data : data?.content || []);
     } catch (e) {
       toast({ title: 'Failed to load employees', description: 'Check API or proxy settings.' });
     } finally {
@@ -76,25 +77,30 @@ export default function AssignTaskPage() {
     }
   };
 
+  // --- Load Projects ---
+  const loadProjects = async () => {
+  setLoadingProjects(true);
+  try {
+    const data = await ProjectsApi.list();
+    setProjects(Array.isArray(data) ? data : data?.content || []);
+  } catch (e) {
+    toast({
+      title: 'Failed to load projects',
+      description: 'Check API or proxy settings.',
+    });
+  } finally {
+    setLoadingProjects(false);
+  }
+};
+
+
+  // --- Load once on mount ---
   useEffect(() => {
     loadEmployees();
+    loadProjects();
   }, []);
 
-    const loadProjects = async () => {
-    setLoadingProjects(true);
-    try {
-      const page = await ProjectsApi.list(0, 500);
-      setProjects(page?.content || []);
-    } catch (e) {
-      toast({ title: 'Failed to load projects', description: 'Check API or proxy settings.' });
-    } finally {
-      setLoadingProjects(false);
-    }
-  };
 
-  useEffect(() => {
-    loadEmployees();
-  }, []);
 
   // Derive departments from employees if you need a filter; backend has no department field.
   // Use empRole as a proxy department to retain your UI.
@@ -108,54 +114,72 @@ export default function AssignTaskPage() {
   };
 
   const handleSubmit = async (e) => {
-    e.preventDefault();
-    if (!formData.assignedTo) {
-      toast({ title: 'Validation', description: 'Please select assignee.' });
-      return;
-    }
-    setSubmitting(true);
-    try {
-      // Lookup selected employee by empId
-      const emp = (employees || []).find(e => String(e.empId) === String(formData.assignedTo));
-      const empName = [emp?.firstName, emp?.lastName].filter(Boolean).join(' ');
+  e.preventDefault();
+  if (!formData.assignedTo) {
+    toast({ title: 'Validation', description: 'Please select assignee.' });
+    return;
+  }
 
-      // Prepare backend payload (EmployeeTaskHistoryCreateRequest)
-      const payload = {
-        empId: formData.assignedTo,                 // e.g., EMP-1001
-        empName,                                    // "First Last" required
-        taskName: formData.title,                   // required
-        taskDescription: formData.description,      // required
-        status: 'ASSIGNED',                         // default
-        dueDate: formData.dueDate ? new Date(formData.dueDate).toISOString() : undefined,
-        taskAssignedBy: user?.name || user?.empId || 'Manager',
-        createdAtDateTime: new Date().toISOString(),
-      };
+  setSubmitting(true);
+  try {
+    // Lookup selected employee
+    const emp = (employees || []).find(
+      (e) => String(e.empId) === String(formData.assignedTo)
+    );
+    const empName = [emp?.firstName, emp?.lastName].filter(Boolean).join(' ');
 
-      const created = await TaskHistoryApi.create(payload);
+     const projectObj = projects.find(
+        (p) => p.projectId === formData.project
+      );
+    const projectName =
+      projectObj?.clientInfo?.projectName || formData.project;
 
-      // Save client-only priority by returned id
-      if (created?.id) setPriorityLocal(created.id, formData.priority);
+    // Prepare backend payload for StoryTableController
+    const payload = {
+      taskName: formData.title,
+      taskDescription: formData.description,
+      type: "Story",
+      description: formData.description,
+      assignedTo: formData.assignedTo || "unassigned",
+      project: projectName,
+      dueDate: formData.dueDate,
+      createdBy: user?.employeeId,
+      department: formData.department,
+      priority: formData.priority,
+      status: "BACKLOG",
+    };
 
-      toast({
-        title: 'Task Assigned Successfully',
-        description: `Task "${formData.title}" has been assigned to ${empName || formData.assignedTo}.`,
-      });
 
-      setFormData({
-        title: '',
-        description: '',
-        assignedTo: '',
-        priority: 'Medium',
-        dueDate: '',
-        department: '',
-      });
-    } catch (err) {
-      const msg = err?.response?.data?.message || err?.response?.data?.error || 'Failed to assign task.';
-      toast({ title: 'Error', description: msg });
-    } finally {
-      setSubmitting(false);
-    }
-  };
+    // ✅ Correct endpoint
+    const { data: created } = await api.post("/api/story-table", payload);
+
+    // Save client-only priority (optional)
+    if (created?.id) setPriorityLocal(created.id, formData.priority);
+
+    toast({
+      title: "Story Created Successfully",
+      description: `Story "${formData.title}" has been assigned to ${empName || formData.assignedTo}.`,
+    });
+
+    setFormData({
+      title: "",
+      description: "",
+      assignedTo: "",
+      priority: "Medium",
+      dueDate: "",
+      department: "",
+    });
+  } catch (err) {
+    const msg =
+      err?.response?.data?.message ||
+      err?.response?.data?.error ||
+      "Failed to create story.";
+    toast({ title: "Error", description: msg });
+  } finally {
+    setSubmitting(false);
+  }
+};
+
 
   return (
     <div className="p-6 max-w-4xl mx-auto space-y-6">
@@ -210,7 +234,7 @@ export default function AssignTaskPage() {
                   <SelectTrigger id="assignedTo">
                     <SelectValue placeholder={loadingEmps ? 'Loading...' : 'Select employee'} />
                   </SelectTrigger>
-                  <SelectContent>
+                  <SelectContent className="bg-white border border-gray-200 shadow-lg">
                     {(employees || []).map((emp) => (
                       <SelectItem key={emp.id} value={emp.empId}>
                         {[emp.firstName, emp.lastName].filter(Boolean).join(' ')} — {emp.empId}
@@ -230,12 +254,23 @@ export default function AssignTaskPage() {
                   <SelectTrigger id="project">
                     <SelectValue placeholder={loadingProjects ? 'Loading...' : 'Select project'} />
                   </SelectTrigger>
-                  <SelectContent>
-                    {(projects || []).map((project) => (
-                      <SelectItem key={project.id} value={project.projectId}>
-                        {project.name}
-                      </SelectItem>
-                    ))}
+
+                  <SelectContent className="bg-white border border-gray-200 shadow-lg">
+                    {(projects || []).map((project, index) => {
+                      const projectName =
+                        project.clientInfo?.projectName ||
+                        project.projectId ||
+                        `Project ${index + 1}`;
+
+                      return (
+                        <SelectItem
+                          key={`${project._id || project.projectId}-${index}`} // ✅ Unique key
+                          value={project.projectId}
+                        >
+                          {projectName}
+                        </SelectItem>
+                      );
+                    })}
                   </SelectContent>
                 </Select>
               </div>
@@ -246,7 +281,7 @@ export default function AssignTaskPage() {
                   <SelectTrigger id="department">
                     <SelectValue placeholder="Select department" />
                   </SelectTrigger>
-                  <SelectContent>
+                  <SelectContent className="bg-white border border-gray-200 shadow-lg">
                     {departments.map((dept) => (
                       <SelectItem key={dept} value={dept}>
                         {dept}
@@ -262,7 +297,7 @@ export default function AssignTaskPage() {
                   <SelectTrigger id="priority">
                     <SelectValue placeholder="Select priority" />
                   </SelectTrigger>
-                  <SelectContent>
+                  <SelectContent className="bg-white border border-gray-200 shadow-lg">
                     <SelectItem value="Low">Low</SelectItem>
                     <SelectItem value="Medium">Medium</SelectItem>
                     <SelectItem value="High">High</SelectItem>

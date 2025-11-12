@@ -1,12 +1,12 @@
 import React, { useState } from "react";
 
-export default function AddTemplateModal({ type, onClose, onSave }) {
+export default function AddTemplateModal({ type, field, onClose, onSave }) {
   const [form, setForm] = useState({
-    title: "",
-    description: "",
-    defaultRole: "",
-    defaultEstimateHours: "",
-    priority: "MEDIUM",
+    taskName: field?.taskName || "",
+    taskDescription: field?.taskDescription || "",
+    priority: field?.priority || "MEDIUM",
+    type: field?.type || type || "",
+    deptName: field?.deptName || "",
   });
 
   const handleChange = (e) => {
@@ -17,22 +17,28 @@ export default function AddTemplateModal({ type, onClose, onSave }) {
     e.preventDefault();
 
     const payload = {
-      ...form,
-      type,
-      defaultEstimateHours: parseInt(form.defaultEstimateHours || 0, 10),
-      tags: [],
+      taskName: form.taskName,
+      taskDescription: form.taskDescription,
+      priority: form.priority,
+      type: form.type,
+      deptName: form.deptName,
     };
 
-    const res = await fetch("/api/task-templates", {
-      method: "POST",
+    const method = field ? "PUT" : "POST";
+    const url = field
+      ? `/api/field-table/${field.id}`
+      : "/api/field-table";
+
+    const res = await fetch(url, {
+      method,
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(payload),
     });
 
     if (res.ok) {
-      onSave(await res.json()); // updates parent UI
+      onSave(await res.json());
     } else {
-      alert("Failed to add template");
+      alert("❌ Failed to save field. Check server logs.");
     }
   };
 
@@ -40,51 +46,61 @@ export default function AddTemplateModal({ type, onClose, onSave }) {
     <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50">
       <div className="bg-white rounded-xl p-6 w-full max-w-md shadow-lg">
         <h3 className="text-lg font-semibold mb-4 text-zinc-900">
-          Add New Feature Template
+          {field ? "Edit Field" : "Add New Field"}
         </h3>
+
         <form onSubmit={handleSubmit} className="space-y-3">
           <div>
-            <label className="text-sm font-medium text-zinc-700">Title</label>
+            <label className="text-sm font-medium text-zinc-700">Task Name</label>
             <input
-              name="title"
-              value={form.title}
+              name="taskName"
+              value={form.taskName}
               onChange={handleChange}
               className="w-full border border-zinc-300 rounded-md px-3 py-2"
               required
             />
           </div>
+
           <div>
-            <label className="text-sm font-medium text-zinc-700">Description</label>
+            <label className="text-sm font-medium text-zinc-700">Task Description</label>
             <textarea
-              name="description"
-              value={form.description}
+              name="taskDescription"
+              value={form.taskDescription}
               onChange={handleChange}
               className="w-full border border-zinc-300 rounded-md px-3 py-2"
               rows={3}
               required
             />
           </div>
-          <div className="grid grid-cols-2 gap-3">
-            <div>
-              <label className="text-sm font-medium text-zinc-700">Default Role</label>
-              <input
-                name="defaultRole"
-                value={form.defaultRole}
-                onChange={handleChange}
-                className="w-full border border-zinc-300 rounded-md px-3 py-2"
-              />
-            </div>
-            <div>
-              <label className="text-sm font-medium text-zinc-700">Est. Hours</label>
-              <input
-                type="number"
-                name="defaultEstimateHours"
-                value={form.defaultEstimateHours}
-                onChange={handleChange}
-                className="w-full border border-zinc-300 rounded-md px-3 py-2"
-              />
-            </div>
+
+          <div>
+            <label className="text-sm font-medium text-zinc-700">Department Name</label>
+            <input
+              name="deptName"
+              value={form.deptName}
+              onChange={handleChange}
+              className="w-full border border-zinc-300 rounded-md px-3 py-2"
+              required
+            />
           </div>
+
+          <div>
+            <label className="text-sm font-medium text-zinc-700">Type</label>
+             <select
+              className="w-full border rounded-md px-3 py-2"
+              value={form.type}
+              onChange={(e) => setForm({ ...form, type: e.target.value })}
+            >
+              <option value="" disabled>Select project type</option>
+              <option value="Website Development">Website Development</option>
+              <option value="Mobile App Development">Mobile App Development</option>
+              <option value="E-commerce Development">E-commerce Development</option>
+              <option value="SEO Services">SEO Services</option>
+              <option value="Content Creation">Content Creation</option>
+              <option value="Digital Marketing">Digital Marketing</option>
+            </select>
+          </div>
+
           <div>
             <label className="text-sm font-medium text-zinc-700">Priority</label>
             <select
