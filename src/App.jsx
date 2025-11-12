@@ -18,10 +18,9 @@ import ClientIntakePage from "./pages/Manager/ClientRequirement";
 import ProjectsPage from "./pages/Manager/Projectspage";
 import EmployeesPage from "./pages/Manager/EmployeesPage";
 import AssignTaskPage from "./pages/Manager/AssignTaskPage";
-import AttendanceSalaryPage from "./pages/Manager/AttendanceSalaryPage";
 import AllTasksPage from "./pages/Manager/AllTasksPage";
 import TaskHistoryPage from "./pages/Manager/TaskHistoryPage";
-import ManagerBoard from "./pages/Manager/ManagerBoard";
+
 import ProjectFieldsPage from "./pages/Manager/ProjectFieldsPage";
 import ProjectSpacesPage from "./pages/Spaces/ProjectSpacesPage";
 import SpacesPage from "./pages/SpacesPage";
@@ -115,16 +114,6 @@ function App() {
               }
             />
             <Route
-              path="/manager-board"
-              element={
-                <ProtectedRoute allowedRoles={["Manager"]}>
-                  <AppShell>
-                    <ManagerBoard />
-                  </AppShell>
-                </ProtectedRoute>
-              }
-            />
-            <Route
               path="/assign-task"
               element={
                 <ProtectedRoute allowedRoles={["Manager", "CEO"]}>
@@ -139,7 +128,7 @@ function App() {
               element={
                 <ProtectedRoute allowedRoles={["Manager", "CEO"]}>
                   <AppShell>
-                    <AttendanceSalaryPage />
+                    <AttendanceManagementPage />
                   </AppShell>
                 </ProtectedRoute>
               }

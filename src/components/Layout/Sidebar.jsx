@@ -27,7 +27,6 @@ const menuConfig = {
   Manager: [
     { path: "/projects", label: "Projects", icon: Users },
     { path: "/employees", label: "Employees", icon: Users },
-    { path: "/manager-board", label: "Manager Board", icon: Users },
     { path: "/assign-task", label: "Create Story", icon: ClipboardList },
     { path: "/attendance-salary", label: "Attendance & Salary", icon: Calendar },
     { path: "/all-tasks", label: "All Tasks", icon: FileText },
