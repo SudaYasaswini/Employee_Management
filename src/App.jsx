@@ -36,6 +36,13 @@ import EmployeeDirectoryPage from "./pages/HR/EmployeeDirectoryPage";
 import AttendanceManagementPage from "./pages/HR/AttendanceManagementPage";
 import OnboardingHRPage from "./pages/HR/OnboardingPage";
 
+//CEO Pages
+import CEODashboardPage from "./pages/CEO/CEODashboardPage";
+import DepartmentReportsPage from "./pages/CEO/DepartmentReportsPage";
+import SalariesOverviewPage from "./pages/CEO/SalariesOverviewPage";
+import TopPerformersPage from "./pages/CEO/TopPerformersPage";
+import TaskAnalyticsPage from "./pages/CEO/TaskAnalyticsPage";
+
 // CEO Pages (Placeholder)
 const PlaceholderPage = ({ title }) => (
   <div className="p-6">

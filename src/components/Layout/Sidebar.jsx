@@ -51,6 +51,8 @@ const menuConfig = {
     { path: "/salaries-overview", label: "Salaries Overview", icon: DollarSign },
     { path: "/top-performers", label: "Top Performers", icon: Award },
     { path: "/task-analytics", label: "Task Analytics", icon: TrendingUp },
+
+  
   ],
   Employee: [
     { path: "/my-tasks", label: "My Tasks", icon: ClipboardList },

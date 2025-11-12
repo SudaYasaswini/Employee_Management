@@ -163,6 +163,7 @@ export default function OnboardingPage() {
       }
 
       const payload = {
+        title: createForm.title,
         firstName: createForm.firstName,
         lastName: createForm.lastName,
         email: createForm.email,
@@ -279,7 +280,7 @@ export default function OnboardingPage() {
             Manage new hires and employee exits
           </p>
         </div>
-
+        
         {/* Create Employee */}
         <Dialog open={createOpen} onOpenChange={setCreateOpen}>
           <DialogTrigger asChild>
@@ -289,77 +290,84 @@ export default function OnboardingPage() {
             </Button>
           </DialogTrigger>
 
-          <DialogContent className="max-w-2xl max-h-[80vh] overflow-y-auto border-white rounded-lg p-6">
+          <DialogContent className="max-w-3xl max-h-[90vh] overflow-y-auto border-white rounded-lg p-6">
             <DialogHeader>
               <DialogTitle>Add New Employee</DialogTitle>
               <DialogDescription>
-                Enter details for the new employee.
+                Enter all required details for the new employee.
               </DialogDescription>
             </DialogHeader>
 
             <form onSubmit={submitCreate} className="space-y-6">
+              <div>
+                <Label>Title *</Label>
+                <select
+                  required
+                  value={createForm.title || ""}
+                  onChange={(e) =>
+                    setCreateForm((s) => ({ ...s, title: e.target.value }))
+                  }
+                  className="w-full border border-gray-300 rounded-md px-3 py-2"
+                >
+                  <option value="">Select Title</option>
+                  <option value="Mr">Mr</option>
+                  <option value="Ms">Ms</option>
+                  <option value="Mrs">Mrs</option>
+                  <option value="Dr">Dr</option>
+                </select>
+              </div>
+              
+              {/* Basic Info */}
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div className="space-y-2">
-                  <Label>First Name</Label>
+                <div>
+                  <Label>First Name *</Label>
                   <Input
                     required
                     value={createForm.firstName}
                     onChange={(e) =>
-                      setCreateForm((s) => ({
-                        ...s,
-                        firstName: e.target.value,
-                      }))
+                      setCreateForm((s) => ({ ...s, firstName: e.target.value }))
                     }
                   />
                 </div>
-                <div className="space-y-2">
-                  <Label>Last Name</Label>
+                <div>
+                  <Label>Last Name *</Label>
                   <Input
                     required
                     value={createForm.lastName}
                     onChange={(e) =>
-                      setCreateForm((s) => ({
-                        ...s,
-                        lastName: e.target.value,
-                      }))
+                      setCreateForm((s) => ({ ...s, lastName: e.target.value }))
                     }
                   />
                 </div>
-                <div className="space-y-2">
-                  <Label>Email</Label>
+                <div>
+                  <Label>Email *</Label>
                   <Input
-                    required
                     type="email"
+                    required
                     value={createForm.email}
                     onChange={(e) =>
                       setCreateForm((s) => ({ ...s, email: e.target.value }))
                     }
                   />
                 </div>
-                <div className="space-y-2">
-                  <Label>Password</Label>
+                <div>
+                  <Label>Password *</Label>
                   <Input
-                    required
                     type="password"
+                    required
                     value={createForm.password}
                     onChange={(e) =>
-                      setCreateForm((s) => ({
-                        ...s,
-                        password: e.target.value,
-                      }))
+                      setCreateForm((s) => ({ ...s, password: e.target.value }))
                     }
                   />
                 </div>
-                <div className="space-y-2">
-                  <Label>Role</Label>
+                <div>
+                  <Label>Role *</Label>
                   <select
                     required
                     value={createForm.empRole}
                     onChange={(e) =>
-                      setCreateForm((s) => ({
-                        ...s,
-                        empRole: e.target.value,
-                      }))
+                      setCreateForm((s) => ({ ...s, empRole: e.target.value }))
                     }
                     className="w-full border border-gray-300 rounded-md px-3 py-2"
                   >
@@ -367,36 +375,30 @@ export default function OnboardingPage() {
                     <option value="HR">HR</option>
                     <option value="Manager">Manager</option>
                     <option value="Employee">Employee</option>
-                    <option value="Owner">Owner</option>
+                    <option value="CEO">CEO</option>
                   </select>
                 </div>
-                <div className="space-y-2">
-                  <Label>Phone</Label>
+                <div>
+                  <Label>Phone *</Label>
                   <Input
                     required
                     value={createForm.phoneNumber}
                     onChange={(e) =>
-                      setCreateForm((s) => ({
-                        ...s,
-                        phoneNumber: e.target.value,
-                      }))
+                      setCreateForm((s) => ({ ...s, phoneNumber: e.target.value }))
                     }
                   />
                 </div>
-                <div className="space-y-2">
-                  <Label>Salary</Label>
+                <div>
+                  <Label>Salary *</Label>
                   <Input
                     required
                     value={createForm.salary}
                     onChange={(e) =>
-                      setCreateForm((s) => ({
-                        ...s,
-                        salary: e.target.value,
-                      }))
+                      setCreateForm((s) => ({ ...s, salary: e.target.value }))
                     }
                   />
                 </div>
-                <div className="space-y-2">
+                <div>
                   <Label>Blood Group</Label>
                   <Input
                     value={createForm.bloodGroup}
@@ -408,9 +410,199 @@ export default function OnboardingPage() {
                     }
                   />
                 </div>
-                <div className="space-y-2">
+                <div>
                   <Label>Employee ID</Label>
                   <Input readOnly value={createForm.empId} />
+                </div>
+              </div>
+
+              {/* Address Section */}
+              <div>
+                <h3 className="font-semibold text-gray-800 mt-6 mb-2">Address</h3>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div>
+                    <Label>Address Line 1 *</Label>
+                    <Input
+                      required
+                      value={createForm.address.address1}
+                      onChange={(e) =>
+                        setCreateForm((s) => ({
+                          ...s,
+                          address: { ...s.address, address1: e.target.value },
+                        }))
+                      }
+                    />
+                  </div>
+                  <div>
+                    <Label>Address Line 2</Label>
+                    <Input
+                      value={createForm.address.address2}
+                      onChange={(e) =>
+                        setCreateForm((s) => ({
+                          ...s,
+                          address: { ...s.address, address2: e.target.value },
+                        }))
+                      }
+                    />
+                  </div>
+                  <div>
+                    <Label>Country *</Label>
+                    <Input
+                      required
+                      value={createForm.address.country}
+                      onChange={(e) =>
+                        setCreateForm((s) => ({
+                          ...s,
+                          address: { ...s.address, country: e.target.value },
+                        }))
+                      }
+                    />
+                  </div>
+                  <div>
+                    <Label>City *</Label>
+                    <Input
+                      required
+                      value={createForm.address.city}
+                      onChange={(e) =>
+                        setCreateForm((s) => ({
+                          ...s,
+                          address: { ...s.address, city: e.target.value },
+                        }))
+                      }
+                    />
+                  </div>
+                  <div>
+                    <Label>Pincode *</Label>
+                    <Input
+                      required
+                      value={createForm.address.pincode}
+                      onChange={(e) =>
+                        setCreateForm((s) => ({
+                          ...s,
+                          address: { ...s.address, pincode: e.target.value },
+                        }))
+                      }
+                    />
+                  </div>
+                </div>
+              </div>
+
+              {/* Bank Details */}
+              <div>
+                <h3 className="font-semibold text-gray-800 mt-6 mb-2">Bank Details</h3>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div>
+                    <Label>Account Number *</Label>
+                    <Input
+                      required
+                      value={createForm.bankDetails.bankAccount}
+                      onChange={(e) =>
+                        setCreateForm((s) => ({
+                          ...s,
+                          bankDetails: { ...s.bankDetails, bankAccount: e.target.value },
+                        }))
+                      }
+                    />
+                  </div>
+                  <div>
+                    <Label>IFSC Code *</Label>
+                    <Input
+                      required
+                      value={createForm.bankDetails.ifscCode}
+                      onChange={(e) =>
+                        setCreateForm((s) => ({
+                          ...s,
+                          bankDetails: {
+                            ...s.bankDetails,
+                            ifscCode: e.target.value.toUpperCase(),
+                          },
+                        }))
+                      }
+                    />
+                  </div>
+                  <div>
+                    <Label>Bank Name *</Label>
+                    <Input
+                      required
+                      value={createForm.bankDetails.bankName}
+                      onChange={(e) =>
+                        setCreateForm((s) => ({
+                          ...s,
+                          bankDetails: { ...s.bankDetails, bankName: e.target.value },
+                        }))
+                      }
+                    />
+                  </div>
+                  <div>
+                    <Label>Branch Name *</Label>
+                    <Input
+                      required
+                      value={createForm.bankDetails.branchName}
+                      onChange={(e) =>
+                        setCreateForm((s) => ({
+                          ...s,
+                          bankDetails: { ...s.bankDetails, branchName: e.target.value },
+                        }))
+                      }
+                    />
+                  </div>
+                </div>
+              </div>
+
+              {/* Emergency Contact */}
+              <div>
+                <h3 className="font-semibold text-gray-800 mt-6 mb-2">
+                  Emergency Contact
+                </h3>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div>
+                    <Label>Name *</Label>
+                    <Input
+                      required
+                      value={createForm.emergencyContact.name}
+                      onChange={(e) =>
+                        setCreateForm((s) => ({
+                          ...s,
+                          emergencyContact: {
+                            ...s.emergencyContact,
+                            name: e.target.value,
+                          },
+                        }))
+                      }
+                    />
+                  </div>
+                  <div>
+                    <Label>Contact Number *</Label>
+                    <Input
+                      required
+                      value={createForm.emergencyContact.contactNumber}
+                      onChange={(e) =>
+                        setCreateForm((s) => ({
+                          ...s,
+                          emergencyContact: {
+                            ...s.emergencyContact,
+                            contactNumber: e.target.value,
+                          },
+                        }))
+                      }
+                    />
+                  </div>
+                  <div>
+                    <Label>Relation *</Label>
+                    <Input
+                      required
+                      value={createForm.emergencyContact.relation}
+                      onChange={(e) =>
+                        setCreateForm((s) => ({
+                          ...s,
+                          emergencyContact: {
+                            ...s.emergencyContact,
+                            relation: e.target.value,
+                          },
+                        }))
+                      }
+                    />
+                  </div>
                 </div>
               </div>
 
@@ -424,6 +616,7 @@ export default function OnboardingPage() {
             </form>
           </DialogContent>
         </Dialog>
+
       </div>
 
       {/* Stats */}
@@ -585,7 +778,7 @@ export default function OnboardingPage() {
                   <option value="HR">HR</option>
                   <option value="Manager">Manager</option>
                   <option value="Employee">Employee</option>
-                  <option value="Owner">Owner</option>
+                  <option value="CEO">CEO</option>
                 </select>
               </div>
             </div>
