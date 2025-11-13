@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { FileText, Image, Paperclip } from "lucide-react";
+import { apiGet } from "../../lib/api";
 function Modal({ open, onClose, children }) {
   if (!open) return null;
   return (
@@ -32,7 +33,7 @@ export default function ProjectsPage() {
 
   const load = async () => {
   try {
-    const res = await fetch(`/api/client-onboard`);
+    const res = await apiGet(`/client-onboard`);
     if (!res.ok) throw new Error("Failed to load projects");
 
     const data = await res.json();
@@ -55,7 +56,7 @@ export default function ProjectsPage() {
 
   const openDetail = async (id) => {
     try {
-      const res = await fetch(`/api/client-onboard/${id}`); // [web:12]
+      const res = await apiGet(`/client-onboard/${id}`); // [web:12]
       if (!res.ok) return; // [web:12]
       const p = await res.json(); // [web:12]
       setSelected(p);

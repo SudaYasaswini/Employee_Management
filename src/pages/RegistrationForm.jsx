@@ -1,5 +1,6 @@
 import React, { useState } from "react";
 import { Eye, EyeOff } from "lucide-react";
+import { apiPost } from "../lib/api";
 
 const EMP_ID_PATTERN = "EMP-[A-Z0-9]{4,20}";
 
@@ -53,11 +54,7 @@ export default function RegistrationForm() {
       setSubmitting(true);
       setAlert({ type: "", message: "" });
 
-      const res = await fetch("/api/v1/auth/register", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(form),
-      });
+      const res = await apiPost("/v1/auth/register", form);
 
       if (res.ok) {
         setAlert({ type: "success", message: "Registration successful." });

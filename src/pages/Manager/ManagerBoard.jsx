@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { DragDropContext, Droppable, Draggable } from "@hello-pangea/dnd";
+import { apiGet, apiPost, apiPut } from "../../lib/api";
 
 // Backend statuses (must match regex in DTO/Entity)
 const CORE_STATUSES = ["ASSIGNED", "PENDING", "COMPLETED", "CANCELLED"];
@@ -8,21 +9,17 @@ const UI_COLUMNS = ["BACKLOG", ...CORE_STATUSES];
 
 // API calls aligned to your Spring controllers
 async function fetchEmployees(page = 0, size = 500) {
-  const res = await fetch(`/api/employees?page=${page}&size=${size}`);
+  const res = await apiGet(`/employees?page=${page}&size=${size}`);
   if (!res.ok) throw new Error(`employees fetch failed: ${res.status}`);
   return res.json();
 }
 async function fetchTasks(page = 0, size = 500) {
-  const res = await fetch(`/api/task-history?page=${page}&size=${size}`);
+  const res = await apiGet(`/task-history?page=${page}&size=${size}`);
   if (!res.ok) throw new Error(`tasks fetch failed: ${res.status}`);
   return res.json();
 }
 async function createTask(payload) {
-  const res = await fetch(`/api/task-history`, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify(payload),
-  });
+  const res = await apiPost(`/task-history`, payload);
   if (!res.ok) {
     const err = await res.text().catch(() => "");
     throw new Error(`task create failed: ${res.status} ${err}`);
@@ -34,11 +31,7 @@ async function updateTask(id, payload) {
   // payload must conform to EmployeeTaskHistoryUpdateRequest
   // Optional: taskName, taskDescription, status, dueDate, updatedAtDateTime, completedAtDateTime
   // Extended: employeeId (String | null) for assignment/unassignment
-  const res = await fetch(`/api/task-history/${id}`, {
-    method: "PATCH",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify(payload),
-  });
+  const res = await apiPut(`/task-history/${id}`, payload);
   if (!res.ok) {
     const err = await res.text().catch(() => "");
     throw new Error(`task update failed: ${res.status} ${err}`);

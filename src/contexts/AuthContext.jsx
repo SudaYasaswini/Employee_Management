@@ -1,4 +1,5 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
+import { apiGet, apiPost } from '../lib/api';
 
 const AuthContext = createContext(null);
 
@@ -31,29 +32,44 @@ export const AuthProvider = ({ children }) => {
 
       // 🔍 if the user entered an email instead of empId, resolve it to empId
       if (empId.includes('@')) {
-        const res = await fetch(`/api/employees?page=0&size=500`);
-        if (!res.ok) return { success: false, error: 'Unable to fetch employees' };
+        console.log('🔍 Resolving email to empId...');
+        const res = await apiGet('/employees?page=0&size=500');
+        if (!res.ok) {
+          console.error('❌ Failed to fetch employees:', res.status, res.statusText);
+          return { success: false, error: 'Unable to fetch employees' };
+        }
         const data = await res.json();
         const found = (data.content || []).find(
           (e) => e.email.toLowerCase() === empId.toLowerCase()
         );
-        if (!found) return { success: false, error: 'Email not found' };
+        if (!found) {
+          console.error('❌ Email not found in employee list');
+          return { success: false, error: 'Email not found' };
+        }
         empId = found.empId;
+        console.log('✅ Email resolved to empId:', empId);
       }
 
       // ✅ Backend login request
-      const res = await fetch('/api/auth/login', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ empId: empId.toUpperCase(), password }),
-      });
+      console.log('🔐 Attempting login with empId:', empId.toUpperCase());
+      const res = await apiPost('/auth/login', { empId: empId.toUpperCase(), password });
+
+      console.log('📡 Login response status:', res.status, res.statusText);
 
       if (!res.ok) {
         const errText = await res.text();
+        console.error('❌ Login failed:', errText);
         return { success: false, error: errText || 'Invalid credentials' };
       }
 
-      const loginResp = await res.json(); // { id, empId, email, empRole, message }
+      const loginResp = await res.json();
+      console.log('📦 Login response data:', loginResp);
+
+      // Validate that we have the required fields
+      if (!loginResp.id || !loginResp.empId || !loginResp.empRole) {
+        console.error('❌ Invalid login response structure:', loginResp);
+        return { success: false, error: 'Invalid response from server' };
+      }
 
       const userData = {
         id: loginResp.id,
@@ -64,12 +80,17 @@ export const AuthProvider = ({ children }) => {
         message: loginResp.message,
       };
 
+      console.log('✅ User data created:', userData);
+      
       setUser(userData);
       localStorage.setItem('user', JSON.stringify(userData));
+      
+      console.log('✅ User saved to localStorage');
 
       return { success: true, user: userData };
     } catch (err) {
-      console.error('Login error:', err);
+      console.error('❌ Login error:', err);
+      console.error('Error details:', err.message, err.stack);
       return { success: false, error: 'Server error during login' };
     }
   };

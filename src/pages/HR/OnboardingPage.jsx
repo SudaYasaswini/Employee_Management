@@ -26,34 +26,31 @@ import {
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "../../components/ui/tabs";
 import { toast } from "../../hooks/use-toast";
 import { Toaster } from "../../components/ui/toaster";
-import axios from "axios";
+import apiClient from "../../lib/apiClient";
 
 // ========== API Setup ==========
-const api = axios.create({
-  baseURL: "/", // proxy to backend (8083)
-  headers: { "Content-Type": "application/json" },
-});
+const api = apiClient;
 
 const EmployeeApi = {
   create: (payload, createdBy = "HR") =>
     api
-      .post(`/api/employees?createdBy=${encodeURIComponent(createdBy)}`, payload)
+      .post(`/employees?createdBy=${encodeURIComponent(createdBy)}`, payload)
       .then((r) => r.data),
 
   update: (id, payload, updatedBy = "HR") =>
     api
-      .put(`/api/employees/${id}?updatedBy=${encodeURIComponent(updatedBy)}`, payload)
+      .put(`/employees/${id}?updatedBy=${encodeURIComponent(updatedBy)}`, payload)
       .then((r) => r.data),
 
   getByEmpId: (empId) =>
-    api.get(`/api/employees/empid/${empId}`).then((r) => r.data),
+    api.get(`/employees/empid/${empId}`).then((r) => r.data),
 
   list: (page = 0, size = 20) =>
-    api.get(`/api/employees?page=${page}&size=${size}`).then((r) => r.data),
+    api.get(`/employees?page=${page}&size=${size}`).then((r) => r.data),
 
   delete: (id, deletedBy = "HR") =>
     api
-      .delete(`/api/employees/${id}?deletedBy=${encodeURIComponent(deletedBy)}`)
+      .delete(`/employees/${id}?deletedBy=${encodeURIComponent(deletedBy)}`)
       .then((r) => r.data),
 };
 

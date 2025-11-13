@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from "react";
 import AddTemplateModal from "../../components/AddTemplateModal";
+import { apiGet, apiDelete } from "../../lib/api";
 
 export default function ProjectFieldsPage() {
   const [fields, setFields] = useState([]);
@@ -16,7 +17,7 @@ export default function ProjectFieldsPage() {
     const fetchFields = async () => {
       try {
         setLoading(true);
-        const res = await fetch("/api/field-table");
+        const res = await apiGet("/field-table");
         if (!res.ok) throw new Error("Failed to load fields");
         const data = await res.json();
         setFields(Array.isArray(data) ? data : []);
@@ -67,7 +68,7 @@ export default function ProjectFieldsPage() {
   const handleDelete = async (id) => {
     if (!window.confirm("Are you sure you want to delete this field?")) return;
     try {
-      const res = await fetch(`/api/field-table/${id}`, { method: "DELETE" });
+      const res = await apiDelete(`/field-table/${id}`);
       if (!res.ok) throw new Error("Failed to delete");
       setFields((prev) => prev.filter((f) => f.id !== id));
     } catch (e) {

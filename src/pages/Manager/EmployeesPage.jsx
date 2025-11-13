@@ -19,19 +19,16 @@ import {
   SelectTrigger,
   SelectValue,
 } from '../../components/ui/select';
-import axios from 'axios';
+import apiClient from '../../lib/apiClient';
 
 // Backend API
-const api = axios.create({
-  baseURL: '/', // same origin; adjust if backend runs elsewhere
-  headers: { 'Content-Type': 'application/json' },
-});
+const api = apiClient;
 
 const EmployeeApi = {
   list: (page = 0, size = 30) =>
-    api.get(`/api/employees?page=${page}&size=${size}`).then((r) => r.data),
+    api.get(`/employees?page=${page}&size=${size}`).then((r) => r.data),
   getByEmpId: (empId) =>
-    api.get(`/api/employees/by-empid/${empId}`).then((r) => r.data),
+    api.get(`/employees/by-empid/${empId}`).then((r) => r.data),
 };
 
 

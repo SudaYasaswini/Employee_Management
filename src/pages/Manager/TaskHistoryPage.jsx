@@ -10,16 +10,13 @@ import {
   TableHeader,
   TableRow,
 } from '../../components/ui/table';
-import axios from 'axios';
+import apiClient from '../../lib/apiClient';
 
 // API
-const api = axios.create({
-  baseURL: '/', // use Vite proxy to backend or set to http://localhost:8083
-  headers: { 'Content-Type': 'application/json' },
-});
+const api = apiClient;
 
 const TaskHistoryApi = {
-  byStatus: (status) => api.get(`/api/task-history/by-status/${status}`).then(r => r.data),
+  byStatus: (status) => api.get(`/task-history/by-status/${status}`).then(r => r.data),
 };
 
 // Optional client-only caches (priority/department) until backend supports them

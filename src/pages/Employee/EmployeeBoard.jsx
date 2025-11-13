@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { useAuth } from "../../contexts/AuthContext";
+import { apiGet, apiPut } from "../../lib/api";
 
 // Employee-facing columns
 const STATUSES_UI = ["Todo", "In Progress", "Review", "Done"];
@@ -82,7 +83,7 @@ export default function EmployeeBoard() {
     if (!empId) return;
     setLoading(true);
     try {
-      const res = await fetch(`/api/task-history/by-emp/${encodeURIComponent(empId)}`);
+      const res = await apiGet(`/task-history/by-emp/${encodeURIComponent(empId)}`);
       const data = await res.json();
       setTasks(normalize(data));
     } catch {
@@ -111,11 +112,7 @@ export default function EmployeeBoard() {
       if (backendStatus === "COMPLETED") payload.completedAtDateTime = new Date().toISOString();
       else payload.updatedAtDateTime = new Date().toISOString();
 
-      const res = await fetch(`/api/task-history/${task.id}`, {
-        method: "PATCH",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(payload),
-      });
+      const res = await apiPut(`/task-history/${task.id}`, payload);
       if (!res.ok) throw new Error('update failed');
     } catch {
       setTasks(prev); // revert on error

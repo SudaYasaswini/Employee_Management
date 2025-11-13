@@ -1,4 +1,5 @@
 import React, { useState } from "react";
+import { apiPost, apiPut } from "../lib/api";
 
 export default function AddTemplateModal({ type, field, onClose, onSave }) {
   const [form, setForm] = useState({
@@ -24,21 +25,19 @@ export default function AddTemplateModal({ type, field, onClose, onSave }) {
       deptName: form.deptName,
     };
 
-    const method = field ? "PUT" : "POST";
-    const url = field
-      ? `/api/field-table/${field.id}`
-      : "/api/field-table";
+    try {
+      const res = field
+        ? await apiPut(`/field-table/${field.id}`, payload)
+        : await apiPost("/field-table", payload);
 
-    const res = await fetch(url, {
-      method,
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(payload),
-    });
-
-    if (res.ok) {
-      onSave(await res.json());
-    } else {
-      alert("❌ Failed to save field. Check server logs.");
+      if (res.ok) {
+        onSave(await res.json());
+      } else {
+        alert("❌ Failed to save field. Check server logs.");
+      }
+    } catch (error) {
+      console.error("Error saving field:", error);
+      alert("❌ Failed to save field. Check console for details.");
     }
   };
 

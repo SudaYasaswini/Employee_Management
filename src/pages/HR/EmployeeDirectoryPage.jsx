@@ -20,19 +20,16 @@ import {
   TableHeader,
   TableRow,
 } from '../../components/ui/table';
-import axios from 'axios';
+import apiClient from '../../lib/apiClient';
 import { toast } from '../../hooks/use-toast';
 import { Toaster } from '../../components/ui/toaster';
 
 // Backend API instance
-const api = axios.create({
-  baseURL: '/',
-  headers: { 'Content-Type': 'application/json' },
-});
+const api = apiClient;
 
 const EmployeeApi = {
   list: (page = 0, size = 50) =>
-    api.get(`/api/employees?page=${page}&size=${size}`).then((r) => r.data),
+    api.get(`/employees?page=${page}&size=${size}`).then((r) => r.data),
 };
 
 const EmployeeDirectoryPage = () => {

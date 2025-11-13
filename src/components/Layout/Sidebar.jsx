@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from "react";
 import { Link, useLocation } from "react-router-dom";
 import { useAuth } from "../../contexts/AuthContext";
+import { apiGet } from "../../lib/api";
 import {
   Users,
   ClipboardList,
@@ -134,7 +135,7 @@ const Sidebar = () => {
     const loadProjects = async () => {
       try {
         setLoadingProjects(true);
-        const res = await fetch("/api/client-onboard?page=0&size=500");
+        const res = await apiGet("/client-onboard?page=0&size=500");
         if (!res.ok) throw new Error("Failed to load projects");
         const page = await res.json();
 

@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from "react";
-import axios from "axios";
+import apiClient from "../../lib/apiClient";
 import {
   ClipboardList,
   Search,
@@ -20,11 +20,8 @@ import { Badge } from "../../components/ui/badge";
 import { toast } from "../../hooks/use-toast";
 import { motion } from "framer-motion";
 
-// API instance
-const api = axios.create({
-  baseURL: "/", // proxy to backend
-  headers: { "Content-Type": "application/json" },
-});
+// Use centralized API client
+const api = apiClient;
 
 export default function AllTasksPage() {
   const [stories, setStories] = useState([]);
@@ -75,7 +72,7 @@ export default function AllTasksPage() {
   const loadStories = async () => {
     try {
       setLoading(true);
-      const res = await api.get("/api/story-table");
+      const res = await api.get("/story-table");
       setStories(Array.isArray(res.data) ? res.data : []);
     } catch (e) {
       toast({
@@ -90,7 +87,7 @@ export default function AllTasksPage() {
   // Fetch employees
   const loadEmployees = async () => {
     try {
-      const res = await api.get("/api/employees");
+      const res = await api.get("/employees");
       setEmployees(Array.isArray(res.data) ? res.data : res.data?.content || []);
     } catch (e) {
       console.error("Failed to load employees", e);
@@ -108,7 +105,7 @@ export default function AllTasksPage() {
       if (!story) return;
       const updated = { ...story, [field]: value };
 
-      await api.put(`/api/story-table/${id}`, updated);
+      await api.put(`/story-table/${id}`, updated);
       toast({
         title: "Story Updated",
         description: `${field} updated successfully.`,

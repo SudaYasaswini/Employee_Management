@@ -1,5 +1,5 @@
 import React, { useEffect, useState, useMemo } from "react";
-import axios from "axios";
+import apiClient from "../../lib/apiClient";
 import { useAuth } from "../../contexts/AuthContext";
 import {
   Calendar,
@@ -31,16 +31,13 @@ import {
   SelectValue,
 } from "../../components/ui/select";
 
-const api = axios.create({
-  baseURL: "/", // your backend proxy or direct URL if needed
-  headers: { "Content-Type": "application/json" },
-});
+const api = apiClient;
 
 const AttendanceAPI = {
-  getAll: () => api.get("/api/attendance").then((r) => r.data),
-  getByEmpId: (empId) => api.get(`/api/attendance/employee/${empId}`).then((r) => r.data),
-  checkIn: (payload) => api.post("/api/attendance/checkin", payload).then((r) => r.data),
-  checkOut: (id) => api.patch(`/api/attendance/checkout/${id}`).then((r) => r.data),
+  getAll: () => api.get("/attendance").then((r) => r.data),
+  getByEmpId: (empId) => api.get(`/attendance/employee/${empId}`).then((r) => r.data),
+  checkIn: (payload) => api.post("/attendance/checkin", payload).then((r) => r.data),
+  checkOut: (id) => api.patch(`/attendance/checkout/${id}`).then((r) => r.data),
 };
 
 export default function AttendancePage() {

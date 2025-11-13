@@ -2,6 +2,7 @@ import React, { useEffect, useState } from "react";
 import { useParams } from "react-router-dom";
 import { DragDropContext, Droppable, Draggable } from "@hello-pangea/dnd";
 import { motion } from "framer-motion";
+import { apiGet, apiPut } from "../../lib/api";
 
 // Prevent flicker / jerking in React 18 StrictMode
 const StrictModeDroppable = ({ children, ...props }) => {
@@ -28,7 +29,7 @@ export default function ProjectSpacesPage() {
   // ─────────── LOADERS ───────────
   const loadProject = async () => {
     try {
-      const res = await fetch(`/api/client-onboard/${projectId}`);
+      const res = await apiGet(`/client-onboard/${projectId}`);
       if (!res.ok) throw new Error("Failed to load project");
       setProject(await res.json());
     } catch (e) {
@@ -38,7 +39,7 @@ export default function ProjectSpacesPage() {
 
   const loadEmployees = async () => {
     try {
-      const res = await fetch("/api/employees");
+      const res = await apiGet("/employees");
       if (!res.ok) throw new Error("Failed to load employees");
       const data = await res.json();
       const list = Array.isArray(data)
@@ -56,7 +57,7 @@ export default function ProjectSpacesPage() {
     if (!projectName) return;
     try {
       setLoading(true);
-      const res = await fetch(`/api/story-table/project/${projectName}`);
+      const res = await apiGet(`/story-table/project/${projectName}`);
       if (!res.ok) throw new Error("Failed to load stories");
       const data = await res.json();
       setStories(Array.isArray(data) ? data : []);
@@ -92,11 +93,7 @@ export default function ProjectSpacesPage() {
     const { destination, source, draggableId } = result;
     if (!destination || destination.droppableId === source.droppableId) return;
     try {
-      await fetch(`/api/story-table/${draggableId}`, {
-        method: "PUT",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ status: destination.droppableId }),
-      });
+      await apiPut(`/story-table/${draggableId}`, { status: destination.droppableId });
       loadStories(project?.clientInfo?.projectName);
     } catch (e) {
       console.error(e);
@@ -184,13 +181,9 @@ export default function ProjectSpacesPage() {
                     onChange={async (e) => {
                       const emp = e.target.value;
                       if (!emp) return;
-                      await fetch(`/api/story-table/${s.id}`, {
-                        method: "PUT",
-                        headers: { "Content-Type": "application/json" },
-                        body: JSON.stringify({
-                          assignedTo: emp,
-                          status: "ASSIGNED",
-                        }),
+                      await apiPut(`/story-table/${s.id}`, {
+                        assignedTo: emp,
+                        status: "ASSIGNED",
                       });
                       loadStories(project?.clientInfo?.projectName);
                     }}

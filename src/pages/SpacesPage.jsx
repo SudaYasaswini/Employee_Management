@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from "react";
 import { ChevronRight, ChevronDown } from "lucide-react";
 import { useNavigate } from "react-router-dom";
+import { apiGet } from "../lib/api";
 
 export default function SpacesPage() {
   const [open, setOpen] = useState({
@@ -19,17 +20,26 @@ export default function SpacesPage() {
 
     const load = async () => {
       try {
-        setLoading(true); // [web:46]
-        const res = await fetch(`/api/projects?page=0&size=100`); // [web:54]
-        if (!res.ok) throw new Error("Failed to load projects"); // [web:54]
-        const page = await res.json(); // [web:54]
-        const content = Array.isArray(page?.content) ? page.content : []; // [web:42]
-        if (!abort) setProjects(content); // [web:46]
+        setLoading(true);
+        console.log('🔍 Loading projects from /client-onboard endpoint...');
+        const res = await apiGet(`/client-onboard?page=0&size=100`);
+        
+        if (!res.ok) {
+          console.error('❌ Response not OK:', res.status, res.statusText);
+          throw new Error(`Failed to load projects: ${res.status} ${res.statusText}`);
+        }
+        
+        const data = await res.json();
+        console.log('✅ Projects loaded successfully:', data);
+        
+        // Handle both array response and paginated response
+        const content = Array.isArray(data) ? data : (Array.isArray(data?.content) ? data.content : []);
+        if (!abort) setProjects(content);
       } catch (e) {
-        console.error("Failed to load projects", e); // [web:54]
-        if (!abort) setProjects([]); // [web:43]
+        console.error("❌ Failed to load projects:", e.message);
+        if (!abort) setProjects([]);
       } finally {
-        if (!abort) setLoading(false); // [web:46]
+        if (!abort) setLoading(false);
       }
     };
 

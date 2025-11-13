@@ -1,5 +1,5 @@
 import React, { useEffect, useState, useMemo } from "react";
-import axios from "axios";
+import apiClient from "../../lib/apiClient";
 import { useAuth } from "../../contexts/AuthContext";
 import {
   Calendar,
@@ -32,18 +32,15 @@ import {
   SelectValue,
 } from "../../components/ui/select";
 
-const api = axios.create({
-  baseURL: "/",
-  headers: { "Content-Type": "application/json" },
-});
+const api = apiClient;
 
 const AttendanceAPI = {
   getAll: (date) =>
-    api.get(`/api/attendance${date ? `?date=${date}` : ""}`).then((r) => r.data),
+    api.get(`/attendance${date ? `?date=${date}` : ""}`).then((r) => r.data),
   getByEmpId: (empId, date) =>
-    api.get(`/api/attendance/employee/${empId}${date ? `?date=${date}` : ""}`).then((r) => r.data),
-  checkIn: (payload) => api.post("/api/attendance/checkin", payload).then((r) => r.data),
-  checkOut: (id) => api.patch(`/api/attendance/checkout/${id}`).then((r) => r.data),
+    api.get(`/attendance/employee/${empId}${date ? `?date=${date}` : ""}`).then((r) => r.data),
+  checkIn: (payload) => api.post("/attendance/checkin", payload).then((r) => r.data),
+  checkOut: (id) => api.patch(`/attendance/checkout/${id}`).then((r) => r.data),
 };
 
 export default function AttendanceManagementPage() {

@@ -15,7 +15,7 @@ import {
 } from '../../components/ui/select';
 import { toast } from '../../hooks/use-toast';
 import { Toaster } from '../../components/ui/toaster';
-import axios from 'axios';
+import { apiGet, apiPost } from '../../lib/api';
 
 // Simple local priority store (client-only until backend supports it)
 const PRIORITY_KEY = 'task_priorities_v1';
@@ -28,21 +28,29 @@ const setPriorityLocal = (taskId, value) => {
 };
 
 // API helpers
-const api = axios.create({
-  baseURL: '/', // use Vite proxy or set to http://localhost:8083
-  headers: { 'Content-Type': 'application/json' },
-});
-
 const EmployeeApi = {
-  list: (page = 0, size = 200) => api.get(`/api/employees?page=${page}&size=${size}`).then(r => r.data),
+  list: async (page = 0, size = 200) => {
+    const res = await apiGet(`/employees?page=${page}&size=${size}`);
+    if (!res.ok) throw new Error('Failed to fetch employees');
+    return res.json();
+  },
 };
 
 const ProjectsApi = {
-  list: () => api.get(`/api/client-onboard`).then(r => r.data),
+  list: async () => {
+    const res = await apiGet(`/client-onboard`);
+    if (!res.ok) throw new Error('Failed to fetch projects');
+    const data = await res.json();
+    return Array.isArray(data) ? data : data?.content || [];
+  },
 };
 
 const TaskHistoryApi = {
-  create: (payload) => api.post('/api/task-history', payload).then(r => r.data),
+  create: async (payload) => {
+    const res = await apiPost('/task-history', payload);
+    if (!res.ok) throw new Error('Failed to create task');
+    return res.json();
+  },
 };
 
 export default function AssignTaskPage() {
@@ -151,7 +159,7 @@ export default function AssignTaskPage() {
 
 
     // ✅ Correct endpoint
-    const { data: created } = await api.post("/api/story-table", payload);
+    const { data: created } = await api.post("/story-table", payload);
 
     // Save client-only priority (optional)
     if (created?.id) setPriorityLocal(created.id, formData.priority);

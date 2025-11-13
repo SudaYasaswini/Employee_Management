@@ -3,6 +3,7 @@ import { z } from "zod";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useRef, useState, useEffect } from "react";
 import TaskTemplatePicker from "../../components/TaskTemplatePicker";
+import { apiGet, apiPost, apiFetch } from "../../lib/api";
 
 // ------------------ Validation Schema ------------------
 const RequirementIntakeSchema = z.object({
@@ -103,7 +104,7 @@ export default function ClientIntakePage() {
 
     const loadFields = async () => {
       try {
-        const res = await fetch("/api/field-table");
+        const res = await apiGet("/field-table");
         if (!res.ok) throw new Error("Failed to load fields");
         const data = await res.json();
 
@@ -208,9 +209,10 @@ export default function ClientIntakePage() {
       }
 
       // POST to multipart endpoint
-      const res = await fetch(`/api/client-onboard`, {
+      const res = await apiFetch(`/client-onboard`, {
         method: "POST",
         body: formData, // DO NOT set Content-Type header; let browser set multipart boundary
+        headers: {}, // Override default JSON header for multipart
       });
 
       if (!res.ok) {
@@ -233,7 +235,7 @@ export default function ClientIntakePage() {
         for (const fieldId of selectedTemplateIds) {
           try {
             // Fetch field details
-            const fieldRes = await fetch(`/api/field-table/${fieldId}`);
+            const fieldRes = await apiGet(`/field-table/${fieldId}`);
             let field = null;
             if (fieldRes.ok) field = await fieldRes.json();
 
@@ -249,11 +251,7 @@ export default function ClientIntakePage() {
               status: "BACKLOG",
             };
 
-            const storyRes = await fetch(`/api/story-table`, {
-              method: "POST",
-              headers: { "Content-Type": "application/json" },
-              body: JSON.stringify(storyPayload),
-            });
+            const storyRes = await apiPost(`/story-table`, storyPayload);
 
             if (!storyRes.ok) {
               console.error(`❌ Failed to create story for field ${fieldId}`);
