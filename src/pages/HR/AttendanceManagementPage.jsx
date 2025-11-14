@@ -35,13 +35,24 @@ import {
 const api = apiClient;
 
 const AttendanceAPI = {
-  getAll: (date) =>
-    api.get(`/attendance${date ? `?date=${date}` : ""}`).then((r) => r.data),
-  getByEmpId: (empId, date) =>
-    api.get(`/attendance/employee/${empId}${date ? `?date=${date}` : ""}`).then((r) => r.data),
-  checkIn: (payload) => api.post("/attendance/checkin", payload).then((r) => r.data),
-  checkOut: (id) => api.patch(`/attendance/checkout/${id}`).then((r) => r.data),
+  getAll: () =>
+    api.get(`/attendance?page=0&size=500`)
+       .then((r) => r.data.content),
+
+  getByEmpId: (empId) =>
+    api.get(`/attendance/employee/${empId}`)
+       .then((r) => r.data),
+
+  checkIn: (payload) =>
+    api.post(`/attendance/checkin`, payload)
+       .then((r) => r.data),
+
+  checkOut: (id) =>
+    api.patch(`/attendance/checkout/${id}`, {
+      checkOut: new Date().toISOString()
+    }).then((r) => r.data)
 };
+
 
 export default function AttendanceManagementPage() {
   const { user } = useAuth();
