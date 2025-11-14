@@ -50,6 +50,7 @@ const AttendanceAPI = {
   checkOut: (id) =>
     api.patch(`/attendance/checkout/${id}`, {
       checkOut: new Date().toISOString()
+
     }).then((r) => r.data)
 };
 
@@ -65,53 +66,62 @@ export default function AttendanceManagementPage() {
   const [todayRecord, setTodayRecord] = useState(null);
   const [searchQuery, setSearchQuery] = useState("");
 
-  const isManagerView = ["HR", "Manager", "Owner"].includes(user?.role);
+  const isManagerView = ["HR", "Manager", "CEO"].includes(user?.role);
 
   const load = async () => {
-    setLoading(true);
-    try {
-      let data = [];
-      if (isManagerView) {
-        data = await AttendanceAPI.getAll(selectedDate);
-      } else {
-        data = await AttendanceAPI.getByEmpId(user.empId, selectedDate);
-      }
-      setRecords(data || []);
+  setLoading(true);
+  try {
+    // 1️⃣ Always load personal records (for check-in/out logic)
+    const selfRecords = await AttendanceAPI.getByEmpId(user.empId);
+    const today = new Date().toISOString().split("T")[0];
+    const personalToday = selfRecords.find((rec) => rec.date === today);
+    setTodayRecord(personalToday || null);
 
-      if (user?.empId) {
-        const today = new Date().toISOString().split("T")[0];
-        const found = data.find(
-          (rec) => rec.empId === user.empId && rec.date === today
-        );
-        setTodayRecord(found || null);
-      }
-    } catch (err) {
-      console.error("Failed to fetch attendance:", err);
-      setRecords([]);
-    } finally {
-      setLoading(false);
+    // 2️⃣ HR + Manager + Owner → show ALL employees (manager view)
+    if (isManagerView) {
+      const all = await AttendanceAPI.getAll(selectedDate);
+      setRecords(all || []);
     }
-  };
+
+    // 3️⃣ Employee → show only own filtered records
+    else {
+      const mine = selfRecords.filter((r) => r.date === selectedDate);
+      setRecords(mine || []);
+    }
+  } catch (err) {
+    console.error("Failed to fetch attendance:", err);
+    setRecords([]);
+  } finally {
+    setLoading(false);
+  }
+};
+
 
   useEffect(() => {
     load();
   }, [selectedDate, user]);
 
   const handleCheckIn = async () => {
-    try {
-      const payload = {
-        empId: user.empId,
-        empName: user.name,
-        workMode,
-      };
-      await AttendanceAPI.checkIn(payload);
-      alert("✅ Checked in successfully!");
-      load();
-    } catch (err) {
-      alert(err.response?.data?.message || "Already checked in today!");
-    }
-  };
+  try {
+    const now = new Date();
 
+    const payload = {
+      empId: user.empId,
+      empName: user.name,
+      date: now.toISOString().split("T")[0],
+      checkIn: now.toISOString(),
+      workMode,
+      status: "Present",
+      empRole: user.role, // HR / Manager / Employee
+    };
+
+    await AttendanceAPI.checkIn(payload);
+    alert("Checked in successfully!");
+    load();
+  } catch (err) {
+    alert(err.response?.data?.message || "Check-in failed");
+  }
+};
   const handleCheckOut = async () => {
     try {
       if (!todayRecord) return alert("No check-in found for today.");
@@ -171,7 +181,7 @@ export default function AttendanceManagementPage() {
           </p>
         </div>
 
-        {user?.role === "Employee" && (
+        {["Employee", "HR", "Manager"].includes(user?.role) && (
           <div className="flex items-center space-x-3">
             <Select value={workMode} onValueChange={setWorkMode}>
               <SelectTrigger className="w-[130px] bg-white border-gray-300 text-gray-800">
@@ -309,7 +319,6 @@ export default function AttendanceManagementPage() {
                 <TableRow>
                   {isManagerView && <TableHead>Employee</TableHead>}
                   {isManagerView && <TableHead>Employee ID</TableHead>}
-                  {isManagerView && <TableHead>Department</TableHead>}
                   <TableHead>Check In</TableHead>
                   <TableHead>Check Out</TableHead>
                   <TableHead>Work Hours</TableHead>
@@ -322,7 +331,6 @@ export default function AttendanceManagementPage() {
                   <TableRow key={r.id}>
                     {isManagerView && <TableCell>{r.empName}</TableCell>}
                     {isManagerView && <TableCell>{r.empId}</TableCell>}
-                    {isManagerView && <TableCell>{r.department || "—"}</TableCell>}
                     <TableCell>
                       {r.checkIn
                         ? new Date(r.checkIn).toLocaleTimeString()
