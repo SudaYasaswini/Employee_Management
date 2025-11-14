@@ -51,7 +51,12 @@ const api = axios.create({
 const AttendanceAPI = {
   getByEmpId: (empId) => api.get(`/api/attendance/employee/${empId}`).then((r) => r.data),
   checkIn: (payload) => api.post("/api/attendance/checkin", payload).then((r) => r.data),
-  checkOut: (id) => api.patch(`/api/attendance/checkout/${id}`).then((r) => r.data),
+  checkOut: (id) =>
+  api.patch(`/api/attendance/checkout/${id}`, {
+    checkOut: new Date().toISOString(),
+    status: "Present"
+  }).then((r) => r.data),
+
 };
 
 // ===============================
@@ -94,30 +99,42 @@ export default function MyAttendancePage() {
   // ACTIONS
   // ===============================
   const handleCheckIn = async () => {
-    try {
-      const payload = {
-        empId: user.empId,
-        empName: user.name,
-        workMode,
-      };
-      await AttendanceAPI.checkIn(payload);
-      alert("Checked in successfully!");
-      load();
-    } catch (err) {
-      alert(err.response?.data?.message || "Check-in failed");
-    }
-  };
+  try {
+    const now = new Date();
+
+    const payload = {
+      empId: user.empId,
+      empName: user.name,
+      date: now.toISOString().split("T")[0],   // yyyy-MM-dd
+      checkIn: now.toISOString(),              // LocalDateTime
+      workMode,
+      status: "Present",
+      empRole: user.role,                      // Add employee role
+    };
+
+    await AttendanceAPI.checkIn(payload);
+    alert("Checked in successfully!");
+    load();
+  } catch (err) {
+    alert(err.response?.data?.message || "Check-in failed");
+  }
+};
+
 
   const handleCheckOut = async () => {
-    if (!todayRecord) return alert("No check-in found for today.");
-    try {
-      await AttendanceAPI.checkOut(todayRecord.id);
-      alert("Checked out successfully!");
-      load();
-    } catch (err) {
-      alert(err.response?.data?.message || "Check-out failed");
-    }
-  };
+  if (!todayRecord) {
+    return alert("No check-in found for today.");
+  }
+
+  try {
+    await AttendanceAPI.checkOut(todayRecord.id);
+    alert("Checked out successfully!");
+    load();
+  } catch (err) {
+    alert(err.response?.data?.message || "Check-out failed");
+  }
+};
+
 
   // ===============================
   // CONDITIONS
@@ -328,3 +345,4 @@ export default function MyAttendancePage() {
     </div>
   );
 }
+
