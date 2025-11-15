@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { mockLeaveRequests } from '../../mock';
 import { FileText, Check, X, Clock, Calendar } from 'lucide-react';
 import { Button } from '../../components/ui/button';
@@ -7,9 +7,22 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '../..
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '../../components/ui/tabs';
 import { toast } from '../../hooks/use-toast';
 import { Toaster } from '../../components/ui/toaster';
+import apiClient from '../../lib/apiClient';
 
 const LeaveRequestsPage = () => {
-  const [requests, setRequests] = useState(mockLeaveRequests);
+  const [requests, setRequests] = useState([]);
+
+useEffect(() => {
+  async function fetchLeaveRequests() {
+    const response = await apiClient.get('/leave-approvel', {
+      params: { page: 0, size: 100 },
+    });
+    setRequests(response.data.content); 
+  }
+  fetchLeaveRequests();
+}, []);
+
+
 
   const pendingRequests = requests.filter((r) => r.status === 'Pending');
   const approvedRequests = requests.filter((r) => r.status === 'Approved');

@@ -8,7 +8,7 @@ import { Textarea } from '../../components/ui/textarea';
 import { Label } from '../../components/ui/label';
 import { toast } from 'sonner';
 
-const LeaveRequestModal = ({ open, onClose }) => {
+const LeaveRequestModal = ({ open, onClose, onSubmitSuccess }) => {
   const { user } = useAuth();
   const [form, setForm] = useState({
     typeOfLeave: 'Sick Leave',
@@ -50,6 +50,8 @@ const LeaveRequestModal = ({ open, onClose }) => {
 
       await applyLeave(payload);
       toast.success('Leave request submitted successfully.');
+      // Call prop callback to notify parent
+      onSubmitSuccess?.();
       onClose();
       setForm({ typeOfLeave: 'Sick Leave', fromDate: '', toDate: '', reason: '' });
 
